@@ -1,54 +1,79 @@
-const { getStore } = require('@netlify/blobs');
+// --- DreamPlay: log-action function ---
+// Accepts POST JSON: { wallet, action, points, note?, sponsor? }
+// or GET: /.netlify/functions/log-action?wallet=0x..&action=...&points=20
+// Persists to Netlify Blobs (if available)
 
-exports.handler = async function(event){
+function corsHeaders() {
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "OPTIONS,POST,GET"
+  };
+}
+function resp(status, body) {
+  return { statusCode: status, headers: { "Content-Type": "application/json", ...corsHeaders() }, body: JSON.stringify(body) };
+}
+
+function isHexAddress(x) {
+  return /^0x[a-fA-F0-9]{40}$/.test(x || "");
+}
+
+async function writeLog(entry) {
   try {
-    let body = {}; try{ body = event.body ? JSON.parse(event.body) : {}; }catch(_){}
-    const addr = (body.address||"").toLowerCase();
-    if (!/^0x[0-9a-f]{40}$/i.test(addr)) {
-      return { statusCode:400, headers:{'content-type':'application/json'}, body: JSON.stringify({ ok:false, error:"Invalid address" }) };
+    // Prefer Netlify Blobs if available
+    const blobs = await import('@netlify/blobs').catch(() => null);
+    if (blobs && blobs.getStore) {
+      const store = blobs.getStore({ name: 'actions' });
+      const key = `log/${Date.now()}-${(entry.wallet || 'unknown').toLowerCase()}`;
+      await store.set(key, JSON.stringify(entry));
+      return { ok: true, storage: "blobs", key };
     }
-    const action = (body.action||"").toUpperCase();
-    const sponsor = (body.sponsor||"").toLowerCase();
-    if (!/^0x[0-9a-f]{40}$/i.test(sponsor)) {
-      return { statusCode:400, headers:{'content-type':'application/json'}, body: JSON.stringify({ ok:false, error:"Sponsor required (0x… address)" }) };
+  } catch (e) {
+    // fall through to memory
+  }
+  // Fallback in-memory (non-persistent)
+  if (!globalThis.__LOGS) globalThis.__LOGS = [];
+  globalThis.__LOGS.push(entry);
+  return { ok: true, storage: "memory", size: globalThis.__LOGS.length };
+}
+
+exports.handler = async (event) => {
+  if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers: corsHeaders() };
+
+  let wallet="", action="", points=0, note="", sponsor="";
+  try {
+    if (event.httpMethod === "POST" && event.body) {
+      const b = JSON.parse(event.body || "{}");
+      wallet = (b.wallet || "").trim();
+      action = (b.action || "").trim();
+      points = Number(b.points || 0);
+      note = (b.note || "").trim();
+      sponsor = (b.sponsor || "").trim();
     }
+    if (!wallet) wallet = (event.queryStringParameters?.wallet || "").trim();
+    if (!action) action = (event.queryStringParameters?.action || "").trim();
+    if (!points) points = Number(event.queryStringParameters?.points || 0);
+    if (!note) note = (event.queryStringParameters?.note || "").trim();
+    if (!sponsor) sponsor = (event.queryStringParameters?.sponsor || "").trim();
+  } catch (_) {}
 
-    const store = getStore({ name:'points', siteID: process.env.NETLIFY_SITE_ID, token: process.env.NETLIFY_ACCESS_TOKEN });
-    const sponsorsList = await store.get('config/sponsors.json', { type:'json' }) || [];
-    const isAllowed = Array.isArray(sponsorsList) && sponsorsList.some(s => (s||"").toLowerCase() === sponsor);
-    if (!isAllowed) {
-      return { statusCode:403, headers:{'content-type':'application/json'}, body: JSON.stringify({ ok:false, error:"Sponsor not permitted. Update config/sponsors.json." }) };
-    }
+  if (!isHexAddress(wallet)) return resp(400, { error: "Missing or invalid wallet" });
+  if (!action) return resp(400, { error: "Missing action" });
+  if (!Number.isFinite(points)) return resp(400, { error: "Invalid points" });
 
-    const POINTS = {
-      "RECRUIT_MEMBER": 20, "COACH_MEMBER": 15, "CREATE_CONTENT": 10, "SHARE_CONTENT": 5,
-      "VERIFY_ID": 15, "QUALITY_CONTROL": 5, "FINLIT_LESSON": 15, "REPORTER": 15,
-      "DREAMCASTER": 15, "VOTE": 10, "BELIEF_CHAIN": 20
-    };
-    const want = POINTS[action] || 1;
+  const entry = {
+    ts: new Date().toISOString(),
+    wallet: wallet.toLowerCase(),
+    action,
+    points,
+    note,
+    sponsor: isHexAddress(sponsor) ? sponsor : undefined
+  };
 
-    const dayKey = new Date().toISOString().slice(0,10);
-    const capsKey = `caps/${dayKey}.json`;
-    const caps = await store.get(capsKey, { type:'json' }) || {};
-    const CAP = 10;
-    const awardedToday = Number(caps[addr]||0);
-    const remaining = Math.max(0, CAP - awardedToday);
-    if (remaining <= 0) {
-      return { statusCode:200, headers:{'content-type':'application/json'}, body: JSON.stringify({ ok:false, capReached:true, message:"Daily cap reached (10 pts)" }) };
-    }
-    const add = Math.min(want, remaining);
-
-    const totalsKey = 'totals.json';
-    const totals = await store.get(totalsKey, { type:'json' }) || {};
-    totals[addr] = (Number(totals[addr]||0) || 0) + add;
-    caps[addr] = awardedToday + add;
-
-    await store.set(totalsKey, JSON.stringify(totals), { contentType:'application/json' });
-    await store.set(capsKey, JSON.stringify(caps), { contentType:'application/json' });
-
-    return { statusCode:200, headers:{'content-type':'application/json'},
-      body: JSON.stringify({ ok:true, added:add, total: totals[addr], action, sponsor, remaining: Math.max(0, CAP - caps[addr]), capped: add<want }) };
-  } catch(e){
-    return { statusCode:500, headers:{'content-type':'application/json'}, body: JSON.stringify({ ok:false, error: String(e && e.message || e) }) };
+  try {
+    const result = await writeLog(entry);
+    return resp(200, { ok: true, ...result, entry });
+  } catch (e) {
+    return resp(500, { error: String(e.message || e) });
   }
 };
