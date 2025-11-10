@@ -1,4 +1,7 @@
 // --- DreamPlay daily claim: rolling 24h + 100/day cap ---
+// Accepts POST { wallet } or GET ?wallet=0x...
+// Persists using Netlify Blobs (siteID+token fallback), else memory.
+
 function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
@@ -7,70 +10,90 @@ function corsHeaders() {
   };
 }
 function resp(status, body) {
-  return { statusCode: status, headers: { "Content-Type": "application/json", ...corsHeaders() }, body: JSON.stringify(body) };
+  return {
+    statusCode: status,
+    headers: { "Content-Type": "application/json", ...corsHeaders() },
+    body: JSON.stringify(body)
+  };
 }
 
 const ROLLING_WINDOW_MS = 24 * 60 * 60 * 1000;
 const POINTS_PER_TASK = 100;
 
-function todayStr(d=new Date()) { return d.toISOString().slice(0,10); }
-function nowMs(){ return Date.now(); }
-function isHexAddress(x){ return /^0x[a-fA-F0-9]{40}$/.test(x || ""); }
+function todayStr(d = new Date()) { return d.toISOString().slice(0, 10); }
+function nowMs() { return Date.now(); }
+function isHexAddress(x) { return /^0x[a-fA-F0-9]{40}$/.test(x || ""); }
+
+// ESM SDK helper: works in CJS by dynamic import, and supports manual site creds.
+async function getBlobsStore(name) {
+  const { getStore } = await import("@netlify/blobs");
+  const opts = { name };
+  if (process.env.BLOBS_SITE_ID && process.env.BLOBS_TOKEN) {
+    opts.siteID = process.env.BLOBS_SITE_ID;
+    opts.token = process.env.BLOBS_TOKEN;
+  }
+  return getStore(opts);
+}
 
 async function readStore(wallet) {
   try {
-    const { getStore } = await import('@netlify/blobs');              // <-- direct dynamic import
-    const store = getStore({ name: 'claims' });
+    const store = await getBlobsStore("claims");
     const key = `claims/${wallet.toLowerCase()}.json`;
     const raw = await store.get(key);
     const json = raw ? JSON.parse(raw) : { lastClaimAt: 0, dayTotals: {} };
-    return { type: 'blobs', store, key, json, diag: 'blobs-ok' };
+    return { type: "blobs", store, key, json, diag: "blobs-ok" };
   } catch (e) {
-    // memory fallback with diagnostics
     if (!globalThis.__CLAIMS) globalThis.__CLAIMS = {};
     globalThis.__CLAIMS[wallet.toLowerCase()] ||= { lastClaimAt: 0, dayTotals: {} };
-    return { type: 'memory', json: globalThis.__CLAIMS[wallet.toLowerCase()], diag: `import-failed:${String(e && e.message || e)}` };
+    return { type: "memory", json: globalThis.__CLAIMS[wallet.toLowerCase()], diag: `import-failed:${String(e && e.message || e)}` };
   }
 }
 
 async function writeStore(ctx) {
-  if (ctx.type === 'blobs') {
+  if (ctx.type === "blobs") {
     await ctx.store.set(ctx.key, JSON.stringify(ctx.json));
-    return 'blobs';
+    return "blobs";
   }
-  return 'memory';
+  return "memory";
 }
 
 exports.handler = async (event) => {
-  if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: corsHeaders() };
+  if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers: corsHeaders() };
 
-  let wallet = '';
+  // read wallet from POST or GET
+  let wallet = "";
   try {
-    if (event.httpMethod === 'POST' && event.body) {
-      const b = JSON.parse(event.body || '{}');
-      wallet = (b.wallet || '').trim();
+    if (event.httpMethod === "POST" && event.body) {
+      const b = JSON.parse(event.body || "{}");
+      wallet = (b.wallet || "").trim();
     }
     if (!wallet) {
       const q = event.queryStringParameters || {};
-      wallet = (q.wallet || '').trim();
+      wallet = (q.wallet || "").trim();
     }
-  } catch(_) {}
+  } catch (_) {}
   if (!isHexAddress(wallet)) return resp(400, { error: "Missing or invalid wallet" });
 
   try {
     const store = await readStore(wallet);
-    const state = store.json;
+    const state = store.json; // { lastClaimAt, dayTotals: { 'YYYY-MM-DD': number } }
 
     const elapsed = nowMs() - (state.lastClaimAt || 0);
     if (elapsed < ROLLING_WINDOW_MS) {
-      return resp(200, { alreadyClaimed: true, nextEligibleMs: ROLLING_WINDOW_MS - elapsed, pointsAwarded: 0, storage: store.type, diag: store.diag });
+      return resp(200, {
+        alreadyClaimed: true,
+        nextEligibleMs: ROLLING_WINDOW_MS - elapsed,
+        pointsAwarded: 0,
+        storage: store.type,
+        diag: store.diag
+      });
     }
 
     const today = todayStr();
     const todayTotal = Number(state.dayTotals[today] || 0);
     const add = Math.min(POINTS_PER_TASK, Math.max(0, 100 - todayTotal));
     if (add === 0) {
-      state.lastClaimAt = nowMs();
+      state.lastClaimAt = nowMs(); // still stamp to throttle spam
       const where = await writeStore(store);
       return resp(200, { capped: true, pointsAwarded: 0, dayTotal: todayTotal, storage: where, diag: store.diag });
     }
