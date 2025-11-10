@@ -1,8 +1,6 @@
 // --- DreamPlay daily claim: rolling 24h + 100/day cap ---
-// Accepts POST JSON { wallet } OR GET ?wallet=0x... (for easy testing)
-
-const ROLLING_WINDOW_MS = 24 * 60 * 60 * 1000;
-const POINTS_PER_TASK = 100;
+// Accepts POST { wallet } or GET ?wallet=0x...
+// Persists using Netlify Blobs if available; falls back to memory.
 
 function corsHeaders() {
   return {
@@ -11,60 +9,84 @@ function corsHeaders() {
     "Access-Control-Allow-Methods": "OPTIONS,POST,GET"
   };
 }
-function resp(statusCode, body) {
-  return {
-    statusCode,
-    headers: { "Content-Type": "application/json", ...corsHeaders() },
-    body: JSON.stringify(body)
-  };
+function resp(status, body) {
+  return { statusCode: status, headers: { "Content-Type": "application/json", ...corsHeaders() }, body: JSON.stringify(body) };
 }
-function now(){ return Date.now(); }
 
-// TEMP storage placeholder (replace with Blobs/Redis later)
-async function getKV(){ return globalThis.__kv || (globalThis.__kv = new Map()); }
+const ROLLING_WINDOW_MS = 24 * 60 * 60 * 1000;
+const POINTS_PER_TASK = 100;
+
+function todayStr(d=new Date()) { return d.toISOString().slice(0,10); }
+function nowMs(){ return Date.now(); }
+function isHexAddress(x){ return /^0x[a-fA-F0-9]{40}$/.test(x || ""); }
+
+async function readStore(wallet) {
+  try {
+    const blobs = await import('@netlify/blobs').catch(() => null);
+    if (blobs && blobs.getStore) {
+      const store = blobs.getStore({ name: 'claims' });
+      const key = `claims/${wallet.toLowerCase()}.json`;
+      const raw = await store.get(key);
+      const json = raw ? JSON.parse(raw) : { lastClaimAt: 0, dayTotals: {} };
+      return { type: 'blobs', store, key, json };
+    }
+  } catch(_) {}
+  // memory fallback
+  if (!globalThis.__CLAIMS) globalThis.__CLAIMS = {};
+  globalThis.__CLAIMS[wallet.toLowerCase()] ||= { lastClaimAt: 0, dayTotals: {} };
+  return { type: 'memory', json: globalThis.__CLAIMS[wallet.toLowerCase()] };
+}
+
+async function writeStore(ctx) {
+  if (ctx.type === 'blobs') {
+    await ctx.store.set(ctx.key, JSON.stringify(ctx.json));
+    return 'blobs';
+  } else {
+    // memory fallback already mutated
+    return 'memory';
+  }
+}
 
 exports.handler = async (event) => {
-  if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers: corsHeaders() };
+  if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: corsHeaders() };
 
-  let wallet = "";
+  // read wallet
+  let wallet = '';
   try {
-    if (event.httpMethod === "POST" && event.body) {
-      const parsed = JSON.parse(event.body || "{}");
-      wallet = (parsed.wallet || "").trim();
+    if (event.httpMethod === 'POST' && event.body) {
+      const b = JSON.parse(event.body || '{}');
+      wallet = (b.wallet || '').trim();
     }
     if (!wallet) {
-      const params = new URLSearchParams(event.queryStringParameters || {});
-      wallet = (params.get?.("wallet") || "").trim();
+      const q = event.queryStringParameters || {};
+      wallet = (q.wallet || '').trim();
     }
-  } catch (_) {}
-
-  if (!wallet) return resp(400, { error: "Missing wallet" });
+  } catch(_) {}
+  if (!isHexAddress(wallet)) return resp(400, { error: "Missing or invalid wallet" });
 
   try {
-    const kv = await getKV();
-    const lastKey = `claim:last:${wallet.toLowerCase()}`;
-    const todayKey = `claim:total:${wallet.toLowerCase()}:${new Date().toISOString().slice(0,10)}`;
+    const store = await readStore(wallet);
+    const state = store.json; // { lastClaimAt, dayTotals: { 'YYYY-MM-DD': number } }
 
-    const last = kv.get(lastKey) || 0;
-    const elapsed = now() - last;
+    const elapsed = nowMs() - (state.lastClaimAt || 0);
     if (elapsed < ROLLING_WINDOW_MS) {
-      return resp(200, {
-        alreadyClaimed: true,
-        nextEligibleMs: ROLLING_WINDOW_MS - elapsed,
-        pointsAwarded: 0
-      });
+      return resp(200, { alreadyClaimed: true, nextEligibleMs: ROLLING_WINDOW_MS - elapsed, pointsAwarded: 0, storage: store.type });
     }
 
-    const todayTotal = kv.get(todayKey) || 0;
+    const today = todayStr();
+    const todayTotal = Number(state.dayTotals[today] || 0);
     const add = Math.min(POINTS_PER_TASK, Math.max(0, 100 - todayTotal));
     if (add === 0) {
-      kv.set(lastKey, now());
-      return resp(200, { capped: true, pointsAwarded: 0, dayTotal: todayTotal });
+      state.lastClaimAt = nowMs(); // still stamp to throttle spam
+      await writeStore(store);
+      return resp(200, { capped: true, pointsAwarded: 0, dayTotal: todayTotal, storage: store.type });
     }
 
-    kv.set(lastKey, now());
-    kv.set(todayKey, todayTotal + add);
-    return resp(200, { alreadyClaimed: false, pointsAwarded: add, dayTotal: todayTotal + add });
+    state.lastClaimAt = nowMs();
+    state.dayTotals[today] = todayTotal + add;
+    const where = await writeStore(store);
+
+    return resp(200, { alreadyClaimed: false, pointsAwarded: add, dayTotal: state.dayTotals[today], storage: where });
   } catch (e) {
     return resp(500, { error: String(e.message || e) });
   }
