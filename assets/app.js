@@ -1,90 +1,42 @@
-
-// --- DreamPlay: MetaMask-only + Polygon switch helper ---
-async function ensurePolygon() {
-  if (!window.ethereum) {
-    throw new Error("MetaMask is required");
-  }
-  const provider = window.ethereum;
-  const polygon = {
-    chainId: '0x89',
-    chainName: 'Polygon Mainnet',
-    nativeCurrency: { name: 'MATIC', symbol: 'MATIC', decimals: 18 },
-    rpcUrls: [window.POLYGON_PUBLIC_RPC || 'https://rpc.ankr.com/polygon'],
-    blockExplorerUrls: ['https://polygonscan.com']
-  };
-  try {
-    await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: polygon.chainId }] });
-  } catch (e) {
-    if (e && e.code === 4902) {
-      await provider.request({ method: 'wallet_addEthereumChain', params: [polygon] });
-    } else {
-      throw e;
-    }
-  }
+async function getWallet() {
+  if (!window.ethereum) throw new Error("MetaMask required");
+  const [account] = await window.ethereum.request({ method: 'eth_requestAccounts' });
+  return account; // full 42-char address
 }
-window.addEventListener('load', async () => {
-  try { await ensurePolygon(); } catch (e) { console.warn(e); }
-});
-// --- end helper ---
 
+async function postJSON(path, body) {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error ? data.error : JSON.stringify(data));
+  return data;
+}
 
-// /assets/app.js — shared helpers (no Supabase/Magic)
-export const App = (() => {
-  const state = {
-    address: localStorage.getItem('walletAddress') || null,
-    chainId: localStorage.getItem('walletChainId') || null,
-  };
-  const short = (a) => a ? `${a.slice(0,6)}…${a.slice(-4)}` : "—";
+// "Recruit a New Member (+20 pts)" button
+async function onLogRecruitClick() {
+  const wallet = await getWallet();
+  const out = await postJSON('/.netlify/functions/log-action', {
+    wallet,
+    action: 'recruit',
+    points: 20
+  });
+  console.log('log-action result', out);
+  alert('Logged +20 points for recruit ✅');
+}
 
-  async function connectMetaMask(statusEl) {
-    if (!window.ethereum) { alert('MetaMask not found'); return null; }
-    try {
-      await window.ethereum.request({ method: 'eth_requestAccounts' });
-      if (window.ethers && window.ethers.BrowserProvider) {
-        const provider = new window.ethers.BrowserProvider(window.ethereum);
-        const signer = await provider.getSigner();
-        const addr = await signer.getAddress();
-        const net  = await provider.getNetwork();
-        state.address = addr;
-        state.chainId = Number(net.chainId);
-        localStorage.setItem('walletAddress', addr);
-        localStorage.setItem('walletChainId', String(state.chainId));
-        if (statusEl) statusEl.textContent = `Connected: ${short(addr)} • chain ${state.chainId}`;
-        return { address: addr, chainId: state.chainId };
-      } else {
-        const [addr] = await window.ethereum.request({ method: 'eth_accounts' });
-        state.address = addr || null;
-        state.chainId = null;
-        localStorage.setItem('walletAddress', state.address || "");
-        if (statusEl) statusEl.textContent = `Connected via MetaMask: ${short(state.address)}`;
-        return { address: state.address, chainId: null };
-      }
-    } catch (e) {
-      console.error(e);
-      if (statusEl) statusEl.textContent = `MetaMask connect failed`;
-      alert(`MetaMask connect failed: ${e && e.message || e}`);
-      return null;
-    }
+// "Claim Daily" button
+async function onClaimDailyClick() {
+  const wallet = await getWallet();
+  const out = await postJSON('/.netlify/functions/claim-daily', { wallet });
+  if (out.alreadyClaimed) {
+    alert('Already claimed — try again after the 24h window.');
+  } else if (out.capped) {
+    alert('Daily cap reached (100 pts).');
+  } else {
+    alert(`Claimed ✅ +${out.pointsAwarded} pts`);
   }
-
-  async function postClaim(reason = "daily-video", extra = {}) {
-    const payload = {
-      reason,
-      address: state.address || localStorage.getItem('walletAddress') || null,
-      chainId: state.chainId || Number(localStorage.getItem('walletChainId')) || null,
-      ...extra
-    };
-    const res = await fetch('/.netlify/functions/claim-daily', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error((res.status===404? 'Function not found at /.netlify/functions/claim-daily' : '') || text || `claim-daily returned ${res.status}`);
-    }
-    try { return await res.json(); } catch(_) { return {}; }
-  }
-
-  return { state, short, connectMetaMask, postClaim };
-})();
+  console.log('claim-daily result', out);
+}
