@@ -1,9 +1,10 @@
-
 [build]
   publish = "."
   functions = "netlify/functions"
 
-[[redirects]]
-  from = "/dgnn"
-  to = "/dgnn/"
-  status = 301
+[build.environment]
+  NODE_VERSION = "18"
+
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["@netlify/blobs"]
