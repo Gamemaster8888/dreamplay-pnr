@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "@netlify/blobs": "^6.5.0"
+  },
+  "scripts": {
+    "build": "echo \"no build\""
+  }
+}

@@ -1,0 +1,9 @@
+
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/dgnn"
+  to = "/dgnn/"
+  status = 301
