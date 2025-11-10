@@ -5,6 +5,7 @@
   "main": "index.html",
   "license": "MIT",
   "dependencies": {
-    "ethers": "^6.13.1"
+    "ethers": "^6.13.1",
+    "@netlify/blobs": "^6.5.0"
   }
 }
