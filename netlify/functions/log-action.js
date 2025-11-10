@@ -19,7 +19,6 @@ function resp(status, body) {
 }
 function isHexAddress(x) { return /^0x[a-fA-F0-9]{40}$/.test(x || ""); }
 
-// ESM SDK helper: works in CJS by dynamic import, and supports manual site creds.
 async function getBlobsStore(name) {
   const { getStore } = await import("@netlify/blobs");
   const opts = { name };
