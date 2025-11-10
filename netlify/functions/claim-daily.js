@@ -24,7 +24,6 @@ function todayStr(d = new Date()) { return d.toISOString().slice(0, 10); }
 function nowMs() { return Date.now(); }
 function isHexAddress(x) { return /^0x[a-fA-F0-9]{40}$/.test(x || ""); }
 
-// ESM SDK helper: works in CJS by dynamic import, and supports manual site creds.
 async function getBlobsStore(name) {
   const { getStore } = await import("@netlify/blobs");
   const opts = { name };
@@ -60,7 +59,6 @@ async function writeStore(ctx) {
 exports.handler = async (event) => {
   if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers: corsHeaders() };
 
-  // read wallet from POST or GET
   let wallet = "";
   try {
     if (event.httpMethod === "POST" && event.body) {
@@ -76,7 +74,7 @@ exports.handler = async (event) => {
 
   try {
     const store = await readStore(wallet);
-    const state = store.json; // { lastClaimAt, dayTotals: { 'YYYY-MM-DD': number } }
+    const state = store.json;
 
     const elapsed = nowMs() - (state.lastClaimAt || 0);
     if (elapsed < ROLLING_WINDOW_MS) {
@@ -93,7 +91,7 @@ exports.handler = async (event) => {
     const todayTotal = Number(state.dayTotals[today] || 0);
     const add = Math.min(POINTS_PER_TASK, Math.max(0, 100 - todayTotal));
     if (add === 0) {
-      state.lastClaimAt = nowMs(); // still stamp to throttle spam
+      state.lastClaimAt = nowMs();
       const where = await writeStore(store);
       return resp(200, { capped: true, pointsAwarded: 0, dayTotal: todayTotal, storage: where, diag: store.diag });
     }
