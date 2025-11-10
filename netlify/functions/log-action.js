@@ -1,8 +1,4 @@
 // --- DreamPlay: log-action function ---
-// Accepts POST JSON: { wallet, action, points, note?, sponsor? }
-// or GET: /.netlify/functions/log-action?wallet=0x..&action=...&points=20
-// Persists to Netlify Blobs (if available)
-
 function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
@@ -13,28 +9,20 @@ function corsHeaders() {
 function resp(status, body) {
   return { statusCode: status, headers: { "Content-Type": "application/json", ...corsHeaders() }, body: JSON.stringify(body) };
 }
-
-function isHexAddress(x) {
-  return /^0x[a-fA-F0-9]{40}$/.test(x || "");
-}
+function isHexAddress(x) { return /^0x[a-fA-F0-9]{40}$/.test(x || ""); }
 
 async function writeLog(entry) {
   try {
-    // Prefer Netlify Blobs if available
-    const blobs = await import('@netlify/blobs').catch(() => null);
-    if (blobs && blobs.getStore) {
-      const store = blobs.getStore({ name: 'actions' });
-      const key = `log/${Date.now()}-${(entry.wallet || 'unknown').toLowerCase()}`;
-      await store.set(key, JSON.stringify(entry));
-      return { ok: true, storage: "blobs", key };
-    }
+    const { getStore } = await import('@netlify/blobs');              // <-- direct dynamic import
+    const store = getStore({ name: 'actions' });
+    const key = `log/${Date.now()}-${(entry.wallet || 'unknown').toLowerCase()}`;
+    await store.set(key, JSON.stringify(entry));
+    return { ok: true, storage: "blobs", key, diag: "blobs-ok" };
   } catch (e) {
-    // fall through to memory
+    if (!globalThis.__LOGS) globalThis.__LOGS = [];
+    globalThis.__LOGS.push(entry);
+    return { ok: true, storage: "memory", size: globalThis.__LOGS.length, diag: `import-failed:${String(e && e.message || e)}` };
   }
-  // Fallback in-memory (non-persistent)
-  if (!globalThis.__LOGS) globalThis.__LOGS = [];
-  globalThis.__LOGS.push(entry);
-  return { ok: true, storage: "memory", size: globalThis.__LOGS.length };
 }
 
 exports.handler = async (event) => {
@@ -64,9 +52,7 @@ exports.handler = async (event) => {
   const entry = {
     ts: new Date().toISOString(),
     wallet: wallet.toLowerCase(),
-    action,
-    points,
-    note,
+    action, points, note,
     sponsor: isHexAddress(sponsor) ? sponsor : undefined
   };
 
