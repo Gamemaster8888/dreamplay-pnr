@@ -1,4 +1,8 @@
-// --- DreamPlay: log-action function ---
+// --- DreamPlay: log-action ---
+// Accepts POST JSON: { wallet, action, points, note?, sponsor? }
+// Or GET: ?wallet=0x..&action=...&points=20
+// Persists to Netlify Blobs (siteID+token fallback), else memory.
+
 function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
@@ -7,15 +11,29 @@ function corsHeaders() {
   };
 }
 function resp(status, body) {
-  return { statusCode: status, headers: { "Content-Type": "application/json", ...corsHeaders() }, body: JSON.stringify(body) };
+  return {
+    statusCode: status,
+    headers: { "Content-Type": "application/json", ...corsHeaders() },
+    body: JSON.stringify(body)
+  };
 }
 function isHexAddress(x) { return /^0x[a-fA-F0-9]{40}$/.test(x || ""); }
 
+// ESM SDK helper: works in CJS by dynamic import, and supports manual site creds.
+async function getBlobsStore(name) {
+  const { getStore } = await import("@netlify/blobs");
+  const opts = { name };
+  if (process.env.BLOBS_SITE_ID && process.env.BLOBS_TOKEN) {
+    opts.siteID = process.env.BLOBS_SITE_ID;
+    opts.token = process.env.BLOBS_TOKEN;
+  }
+  return getStore(opts);
+}
+
 async function writeLog(entry) {
   try {
-    const { getStore } = await import('@netlify/blobs');              // <-- direct dynamic import
-    const store = getStore({ name: 'actions' });
-    const key = `log/${Date.now()}-${(entry.wallet || 'unknown').toLowerCase()}`;
+    const store = await getBlobsStore("actions");
+    const key = `log/${Date.now()}-${(entry.wallet || "unknown").toLowerCase()}`;
     await store.set(key, JSON.stringify(entry));
     return { ok: true, storage: "blobs", key, diag: "blobs-ok" };
   } catch (e) {
@@ -28,7 +46,7 @@ async function writeLog(entry) {
 exports.handler = async (event) => {
   if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers: corsHeaders() };
 
-  let wallet="", action="", points=0, note="", sponsor="";
+  let wallet = "", action = "", points = 0, note = "", sponsor = "";
   try {
     if (event.httpMethod === "POST" && event.body) {
       const b = JSON.parse(event.body || "{}");
@@ -52,7 +70,9 @@ exports.handler = async (event) => {
   const entry = {
     ts: new Date().toISOString(),
     wallet: wallet.toLowerCase(),
-    action, points, note,
+    action,
+    points,
+    note,
     sponsor: isHexAddress(sponsor) ? sponsor : undefined
   };
 
