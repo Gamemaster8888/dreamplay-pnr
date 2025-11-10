@@ -1,0 +1,5 @@
+[
+  "function isAnchor(address) view returns (bool)",
+  "function hasLaunched(address) view returns (bool)",
+  "event ProjectLaunched(address token, address creator, address sponsor, address[8] uplines, uint64 scheduleStart)"
+]
