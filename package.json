@@ -1,8 +1,10 @@
 {
+  "name": "dreamplay-pnr",
+  "version": "1.0.0",
+  "description": "DreamPlay Personal Natural Resources (PNR) Digital Miner app for Polygon",
+  "main": "index.html",
+  "license": "MIT",
   "dependencies": {
-    "@netlify/blobs": "^6.5.0"
-  },
-  "scripts": {
-    "build": "echo \"no build\""
+    "ethers": "^6.13.1"
   }
 }
