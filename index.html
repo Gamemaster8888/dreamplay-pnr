@@ -22,7 +22,7 @@
     .btn-green { background:#22c55e; color:#fff; }
     .btn-blue { background:#3b82f6; color:#fff; }
     .soft { background:#f3f4f6; border-radius:8px; padding:6px 10px; }
-    .small { font-size:.92rem; opacity:.9; }
+    .small { font-size:.92rem; opacity:.95; }
     .muted { color:var(--muted); }
     a { color:var(--link); text-decoration:none; }
     a.badge-link { border:1px solid #d6bcfa; background:#f5f3ff; padding:6px 10px; border-radius:999px; font-weight:600; }
@@ -102,7 +102,7 @@
             title="YouTube video player" frameborder="0"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-          <!-- cover forces interaction before fallback countdown begins -->
+          <!-- cover forces interaction before countdown begins -->
           <div id="videoCover" class="videoCover" title="Click to start watching"></div>
         </div>
       </div>
@@ -135,11 +135,34 @@
         <tbody id="lbTableBody"><tr><td>—</td><td>—</td><td>—</td></tr></tbody>
       </table>
     </section>
+
+    <!-- Post Point Board -->
+    <section class="card">
+      <h2>Post Point Board (from my actions)</h2>
+      <div class="row" style="gap:.5rem">
+        <button id="ppbRefresh" class="soft">Build My Post Point Board</button>
+        <span id="ppbStatus" class="small"></span>
+      </div>
+      <div class="row" style="margin-top:.5rem">
+        <div class="soft small">Level totals (applied to my awarded points)</div>
+      </div>
+      <table style="margin-top:.5rem">
+        <thead><tr><th>Level</th><th>%</th><th>Points</th></tr></thead>
+        <tbody id="ppbLevels"><tr><td>—</td><td>—</td><td>—</td></tr></tbody>
+      </table>
+      <div class="row" style="margin-top:1rem">
+        <div class="soft small">Who earned from my efforts</div>
+      </div>
+      <table>
+        <thead><tr><th>#</th><th>Upline</th><th>Points</th></tr></thead>
+        <tbody id="ppbWallets"><tr><td>—</td><td>—</td><td>—</td></tr></tbody>
+      </table>
+    </section>
   </div>
 
   <script>
   (function(){
-    // ------------- helpers -------------
+    // ---------- helpers ----------
     const CHAIN_ID_HEX = "0x89"; // Polygon Mainnet
     const POLYGON_PARAMS = {
       chainId: CHAIN_ID_HEX,
@@ -150,13 +173,13 @@
     };
     const $ = (s)=>document.querySelector(s);
     const short = (a)=> a ? a.slice(0,6)+"…"+a.slice(-4) : "";
-    const isAddr = (x)=> /^0x[a-fA-F0-9]{40}$/.test(x||"");
+    const isAddr = (x)=> /^0x[a-fA-F0-9]{40}$/i.test(x||"");
     function setStatus(t){ const el=$("#connStatus"); if(el) el.textContent=t; }
     function setPointsToday(t){ const el=$("#pointsToday"); if(el) el.textContent=t; }
     async function getJSON(url){ const r=await fetch(url,{headers:{accept:"application/json"}}); const d=await r.json().catch(()=>({})); if(!r.ok) throw new Error(d?.error||JSON.stringify(d)); return d; }
     async function postJSON(url,body){ const r=await fetch(url,{method:"POST",headers:{"content-type":"application/json",accept:"application/json"},body:JSON.stringify(body)}); const d=await r.json().catch(()=>({})); if(!r.ok) throw new Error(d?.error||JSON.stringify(d)); return d; }
 
-    // ------------- wallet -------------
+    // ---------- wallet ----------
     const state = { wallet:"" };
     async function ensureEthereum(){ if(!window.ethereum){ alert("MetaMask required"); throw new Error("no metamask"); } return window.ethereum; }
     async function ensurePolygon(eth){
@@ -192,22 +215,18 @@
             state.wallet = acct;
             setStatus(`Connected: ${short(acct)} • chain 137`);
             const tot = await getTodayTotal(); if (typeof tot==="number") setPointsToday(`Points today: ${tot} / 100`);
-          } else {
-            setStatus("Not connected");
-          }
+          } else { setStatus("Not connected"); }
         }
       } catch {}
     })();
 
-    // ------------- sponsor validation (UI hint) -------------
+    // ---------- sponsor validation ----------
     async function validateSponsorUI(addr){
       if (!isAddr(addr)) return { ok:false, reason:"Invalid address" };
       try {
         const res = await getJSON(`/.netlify/functions/admin-sponsors?sponsor=${addr}`);
         return res?.valid ? { ok:true } : { ok:false, reason: res?.reason || "Not an Anchor/Launcher" };
-      } catch(e){
-        return { ok:false, reason: e?.message || "Validation error" };
-      }
+      } catch(e){ return { ok:false, reason: e?.message || "Validation error" }; }
     }
     $("#checkSponsorBtn")?.addEventListener("click", async ()=>{
       const s = ($("#sponsorInput")?.value||"").trim();
@@ -217,7 +236,7 @@
       else { el.className="small bad"; el.textContent=`Invalid sponsor: ${out.reason||""}`; }
     });
 
-    // ------------- log action -------------
+    // ---------- log action ----------
     $("#logBtn")?.addEventListener("click", async ()=>{
       if (!isAddr(state.wallet)) { alert("Connect wallet first"); return; }
       const id = $("#actionSelect")?.value || "RECRUIT_MEMBER";
@@ -225,7 +244,6 @@
       const ptsMap = {RECRUIT_MEMBER:20,COACH_MEMBER:15,CREATE_CONTENT:10,SHARE_CONTENT:5,VERIFY_ID:15,QUALITY_CONTROL:5,FINLIT_LESSON:15,REPORTER:15,DREAMCASTER:15,VOTE:10,BELIEF_CHAIN:20};
       const pts = ptsMap[id]||0;
 
-      // client hint (server still enforces on-chain)
       const sEl = $("#sponsorStatus");
       const vOut = await validateSponsorUI(sponsor);
       if (!vOut.ok){
@@ -251,15 +269,10 @@
       } catch(e){ st.textContent="Log failed"; alert(e?.message||e); }
     });
 
-    // ------------- YouTube gating -------------
+    // ---------- YouTube gating ----------
     let player, duration=0, watched=0, playing=false, apiReady=false, started=false;
     const cover = $("#videoCover");
-    if (cover){
-      cover.addEventListener("click", ()=>{
-        started = true;
-        cover.style.display = "none"; // reveal iframe; user presses play
-      });
-    }
+    if (cover){ cover.addEventListener("click", ()=>{ started = true; cover.style.display = "none"; }); }
     window.onYouTubeIframeAPIReady = function(){
       const dbg=$("#claimDebug"); apiReady=true; if(dbg) dbg.textContent="YouTube API ready";
       try{
@@ -277,12 +290,12 @@
     setInterval(()=>{ if (started && playing){ watched += 0.5; updateGate(); } }, 500);
 
     function eligibleNow(){
-      if (!started) return false; // must interact first
+      if (!started) return false;
       if (apiReady && player){
         let pct=0; try{ pct = duration ? (player.getCurrentTime()/Math.max(duration,1)) : 0; }catch(_){}
         return (watched >= 60) && (pct >= 0.5);
       }
-      return watched >= 60; // fallback-after-interaction
+      return watched >= 60;
     }
     function updateGate(){
       const btn=$("#claimBtn"), status=$("#claimStatus");
@@ -338,7 +351,6 @@
           status.textContent = "No points awarded.";
         }
 
-        // refresh “points today”
         try {
           const s = await fetch(`/.netlify/functions/claim-daily?wallet=${wallet}&mode=status`, { headers:{accept:"application/json"} });
           const j = await s.json();
@@ -346,7 +358,6 @@
           if (typeof j?.dayTotal === "number" && pt) pt.textContent = `Points today: ${j.dayTotal} / 100`;
         } catch {}
 
-        // refresh leaderboard
         document.getElementById("refreshLbBtn")?.click();
       } catch (e) {
         status.textContent = "Claim failed";
@@ -356,7 +367,7 @@
       }
     });
 
-    // ------------- verifier -------------
+    // ---------- verifier ----------
     $("#checkFunctions")?.addEventListener("click", async ()=>{
       const el=$("#verifyStatus"); el.textContent="Calling blobs-selftest…";
       try{ const r=await fetch("/.netlify/functions/blobs-selftest",{headers:{accept:"application/json"}}); el.textContent="blobs-selftest: "+(await r.text()).slice(0,140); }
@@ -368,7 +379,7 @@
       catch(e){ el.textContent="nonce failed: "+(e?.message||e); }
     });
 
-    // ------------- leaderboard -------------
+    // ---------- leaderboard ----------
     async function refreshLeaderboard(){
       const body=$("#lbTableBody"), lbStatus=$("#lbStatus"), lbUpdated=$("#lbUpdated");
       lbStatus.textContent="Loading…";
@@ -383,6 +394,38 @@
     }
     $("#refreshLbBtn")?.addEventListener("click", refreshLeaderboard);
     refreshLeaderboard();
+
+    // ---------- Post Point Board (8 levels) ----------
+    async function buildPostPointBoard(){
+      const status = document.getElementById("ppbStatus");
+      const tbodyLv = document.getElementById("ppbLevels");
+      const tbodyW  = document.getElementById("ppbWallets");
+      try {
+        if (!window.ethereum) throw new Error("Connect wallet first");
+        const accts = await window.ethereum.request({ method:"eth_accounts" });
+        const wallet = (accts && accts[0]) || "";
+        if (!/^0x[a-fA-F0-9]{40}$/i.test(wallet)) throw new Error("Connect wallet first");
+        status.textContent = "Building…";
+        const r = await fetch(`/.netlify/functions/post-board?wallet=${wallet}`, { headers:{accept:"application/json"} });
+        const data = await r.json().catch(()=>({}));
+        if (!data?.ok) throw new Error(data?.error || "Post board failed");
+
+        if (Array.isArray(data.levels) && data.levels.length){
+          tbodyLv.innerHTML = data.levels.map(l => `<tr><td>L${l.level}</td><td>${l.pct}%</td><td>${l.points}</td></tr>`).join("");
+        } else {
+          tbodyLv.innerHTML = `<tr><td>—</td><td>—</td><td>—</td></tr>`;
+        }
+        if (Array.isArray(data.totals) && data.totals.length){
+          tbodyW.innerHTML = data.totals.map((row,i)=>`<tr><td>${i+1}</td><td>${row[0].slice(0,6)}…${row[0].slice(-4)}</td><td>${row[1]}</td></tr>`).join("");
+        } else {
+          tbodyW.innerHTML = `<tr><td>—</td><td>—</td><td>—</td></tr>`;
+        }
+        status.textContent = `Built from ${data.actions} action(s).`;
+      } catch (e) {
+        status.textContent = e?.message || "Error";
+      }
+    }
+    document.getElementById("ppbRefresh")?.addEventListener("click", buildPostPointBoard);
   })();
   </script>
 </body>
