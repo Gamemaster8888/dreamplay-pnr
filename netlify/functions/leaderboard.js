@@ -1,103 +1,55 @@
 // netlify/functions/leaderboard.js
-export async function handler() {
-  try {
-    const { getStore } = await import("@netlify/blobs");
-    const store = getStore({
-      name: "claims",
-      ...(process.env.BLOBS_SITE_ID && process.env.BLOBS_TOKEN
-        ? { siteID: process.env.BLOBS_SITE_ID, token: process.env.BLOBS_TOKEN }
-        : {})
-    });
+// Reads today's totals from the 'claims' store only.
 
-    const today = new Date().toISOString().slice(0, 10);
-    const entries = [];
-
-    // Some Netlify environments return a paged object { blobs, cursor }
-    // Others (older/newer combos) expose an async iterator.
-    // This supports both.
-
-    async function handleBlobKey(key) {
-      if (!key || !key.startsWith("claims/") || !key.endsWith(".json")) return;
-      const raw = await store.get(key);
-      if (!raw) return;
-      try {
-        const json = JSON.parse(raw);
-        const total = Number(json?.dayTotals?.[today] || 0);
-        const wallet = key.replace(/^claims\//, "").replace(/\.json$/, "");
-        if (total > 0 && /^0x[a-fA-F0-9]{40}$/i.test(wallet)) {
-          entries.push([wallet, total]);
-        }
-      } catch {
-        /* ignore bad blobs */
-      }
-    }
-
-    async function listPaged(prefix) {
-      let cursor = undefined;
-      do {
-        const res = await store.list({ prefix, cursor });
-        // Expected shape: { blobs: [{ key, size, ... }], cursor?: string }
-        const page = res?.blobs || [];
-        for (const b of page) {
-          await handleBlobKey(b.key);
-        }
-        cursor = res?.cursor;
-      } while (cursor);
-    }
-
-    // Try paged listing first
-    let listed = false;
-    try {
-      if (typeof store.list === "function") {
-        const test = await store.list({ prefix: "claims/" });
-        if (test && Array.isArray(test.blobs)) {
-          // We already consumed first page in `test`, but to
-          // keep logic simple, run the full paged flow which
-          // will fetch the first page again (cheap).
-          await listPaged("claims/");
-          listed = true;
-        }
-      }
-    } catch {
-      // fallthrough to iterator path
-    }
-
-    // Fallback: async-iterable listing (older SDKs)
-    if (!listed) {
-      if (store && typeof store.list === "function") {
-        try {
-          // Some environments implement store.list as async iterable directly.
-          for await (const item of store.list({ prefix: "claims/" })) {
-            // Expected shape: item.key
-            await handleBlobKey(item?.key);
-          }
-          listed = true;
-        } catch {
-          // still not supported
-        }
-      }
-    }
-
-    if (!listed) {
-      return {
-        statusCode: 500,
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
-        body: JSON.stringify({ ok: false, error: "Blobs listing not supported in this environment" })
-      };
-    }
-
-    entries.sort((a, b) => b[1] - a[1]);
-
-    return {
-      statusCode: 200,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
-      body: JSON.stringify({ ok: true, entries })
-    };
-  } catch (e) {
-    return {
-      statusCode: 500,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
-      body: JSON.stringify({ ok: false, error: String(e?.message || e) })
-    };
-  }
+function cors() {
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "OPTIONS,GET"
+  };
 }
+function reply(status, body) {
+  return { statusCode: status, headers: { "Content-Type":"application/json", ...cors() }, body: JSON.stringify(body) };
+}
+const todayStr = (d=new Date()) => d.toISOString().slice(0,10);
+
+async function getStore() {
+  const blobs = await import("@netlify/blobs").catch(()=>null);
+  if (!blobs || !blobs.getStore) throw new Error("Blobs SDK not available");
+  return blobs.getStore({
+    name: "claims",
+    ...(process.env.BLOBS_SITE_ID && process.env.BLOBS_TOKEN
+      ? { siteID: process.env.BLOBS_SITE_ID, token: process.env.BLOBS_TOKEN }
+      : {})
+  });
+}
+
+exports.handler = async (event) => {
+  if (event.httpMethod === "OPTIONS") return { statusCode:204, headers: cors() };
+  if (event.httpMethod !== "GET") return reply(405, { ok:false, error:"Method not allowed" });
+
+  try {
+    const store = await getStore();
+    const items = [];
+    for await (const k of store.list({ prefix: "claims/" })) items.push(k);
+
+    const today = todayStr();
+    const scores = [];
+    for (const key of items) {
+      const raw = await store.get(key);
+      if (!raw) continue;
+      try {
+        const j = JSON.parse(raw);
+        const addr = key.split("/")[1]?.replace(".json","") || "";
+        const total = Number(j?.dayTotals?.[today] || 0);
+        if (addr && total > 0) scores.push([addr, total]);
+      } catch {}
+    }
+
+    scores.sort((a,b) => b[1]-a[1]);
+    const entries = scores.slice(0, 100);
+    return reply(200, { ok:true, entries, date: today, source: "claims" });
+  } catch (e) {
+    return reply(500, { ok:false, error: String(e?.message || e) });
+  }
+};
