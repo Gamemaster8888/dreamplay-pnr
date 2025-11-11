@@ -28,8 +28,13 @@
     a { color:var(--link); text-decoration:none; }
     a.badge-link { border:1px solid #d6bcfa; background:#f5f3ff; padding:6px 10px; border-radius:999px; font-weight:600; }
     .grow { flex:1 1 auto; min-width:240px; }
+    .ok { color:#16a34a; }
+    .bad { color:#dc2626; }
+    .soft { background:#f3f4f6; border-radius:8px; padding:6px 10px; }
+    .videoWrap { position:relative; display:inline-block; }
+    .videoCover { position:absolute; inset:0; cursor:pointer; }
+    .badge { display:inline-block; padding:3px 8px; border:1px solid #dbeafe; background:#eff6ff; border-radius:999px; }
   </style>
-  <!-- libs -->
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
   <script src="https://www.youtube.com/iframe_api"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
@@ -51,7 +56,7 @@
       <div class="row">
         <button id="connectBtn" class="btn-primary">Connect with MetaMask</button>
         <span id="connStatus" class="small">Not connected</span>
-        <span id="jsStatus" class="small" style="display:inline-block; padding:3px 8px; border:1px solid #dbeafe; background:#eff6ff; border-radius:999px;">JS loaded</span>
+        <span class="badge">JS loaded</span>
       </div>
       <div id="pointsToday" class="small muted"></div>
     </section>
@@ -72,21 +77,28 @@
           <option value="VOTE">Vote (+10 pts)</option>
           <option value="BELIEF_CHAIN">Join the Belief Chain (+20 pts)</option>
         </select>
-        <input id="sponsorInput" class="grow" placeholder="Optional: sponsor address">
-        <button id="logBtn" class="btn-green">Log Action</button>
+        <input id="sponsorInput" class="grow" placeholder="Sponsor (required)">
+        <button id="checkSponsorBtn" class="soft">Check sponsor</button>
+        <span id="sponsorStatus" class="small muted"></span>
       </div>
-      <div id="actorStatus" class="small" style="margin-top:6px"></div>
+      <div class="row" style="gap:.5rem; margin-top:.5rem">
+        <button id="logBtn" class="btn-green">Log Action</button>
+        <div id="actorStatus" class="small"></div>
+      </div>
     </section>
 
     <section class="card">
       <h2>Daily Video</h2>
       <div class="row">
-        <iframe id="video" width="560" height="315"
-          src="https://www.youtube.com/embed/olQrCfkvbGw?rel=0&enablejsapi=1&playsinline=1"
-          title="YouTube video player" frameborder="0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          referrerpolicy="strict-origin-when-cross-origin" allowfullscreen>
-        </iframe>
+        <div class="videoWrap">
+          <iframe id="video" width="560" height="315"
+            src="https://www.youtube.com/embed/olQrCfkvbGw?rel=0&enablejsapi=1&playsinline=1"
+            title="YouTube video player" frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+          <!-- cover forces interaction before fallback countdown begins -->
+          <div id="videoCover" class="videoCover" title="Click to start watching"></div>
+        </div>
       </div>
       <div class="row" style="margin-top:.5rem">
         <button id="claimBtn" class="btn-blue" disabled>Claim Daily Points</button>
@@ -119,8 +131,8 @@
 
   <script>
   (function(){
-    // ---------- config ----------
-    const CHAIN_ID_HEX = "0x89"; // Polygon mainnet
+    // ------------------ config & helpers ------------------
+    const CHAIN_ID_HEX = "0x89"; // Polygon
     const POLYGON_PARAMS = {
       chainId: CHAIN_ID_HEX,
       chainName: "Polygon Mainnet",
@@ -128,239 +140,215 @@
       rpcUrls: [window.POLYGON_PUBLIC_RPC || "https://rpc.ankr.com/polygon"],
       blockExplorerUrls: ["https://polygonscan.com"]
     };
+    const $ = (s)=>document.querySelector(s);
+    const short = (a)=> a ? a.slice(0,6)+"…"+a.slice(-4) : "";
+    const isAddr = (x)=> /^0x[a-fA-F0-9]{40}$/.test(x||"");
 
-    // ---------- DOM helpers ----------
-    const $ = (s) => document.querySelector(s);
-    const short = (a) => (a ? a.slice(0,6) + "…" + a.slice(-4) : "");
+    async function getJSON(url){ const r=await fetch(url,{headers:{accept:"application/json"}}); const d=await r.json().catch(()=>({})); if(!r.ok) throw new Error(d?.error||JSON.stringify(d)); return d; }
+    async function postJSON(url,body){ const r=await fetch(url,{method:"POST",headers:{"content-type":"application/json",accept:"application/json"},body:JSON.stringify(body)}); const d=await r.json().catch(()=>({})); if(!r.ok) throw new Error(d?.error||JSON.stringify(d)); return d; }
+
+    // ------------------ wallet ------------------
+    const state = { wallet:"" };
     function setStatus(t){ const el=$("#connStatus"); if(el) el.textContent=t; }
     function setPointsToday(t){ const el=$("#pointsToday"); if(el) el.textContent=t; }
 
-    // ---------- wallet helpers ----------
-    async function ensureEthereum(){
-      if (!window.ethereum) { alert("MetaMask is required."); throw new Error("MetaMask not found"); }
-      return window.ethereum;
-    }
+    async function ensureEthereum(){ if(!window.ethereum){ alert("MetaMask required"); throw new Error("no metamask"); } return window.ethereum; }
     async function ensurePolygon(eth){
-      const current = await eth.request({ method:"eth_chainId" });
-      if (current !== CHAIN_ID_HEX){
-        try {
-          await eth.request({ method:"wallet_switchEthereumChain", params:[{ chainId: CHAIN_ID_HEX }] });
-        } catch(e){
-          if (e && e.code === 4902){
-            await eth.request({ method:"wallet_addEthereumChain", params:[POLYGON_PARAMS] });
-          } else { throw e; }
-        }
+      const id = await eth.request({ method:"eth_chainId" });
+      if (id !== CHAIN_ID_HEX){
+        try { await eth.request({ method:"wallet_switchEthereumChain", params:[{chainId:CHAIN_ID_HEX}] }); }
+        catch(e){ if(e&&e.code===4902){ await eth.request({ method:"wallet_addEthereumChain", params:[POLYGON_PARAMS] }); } else { throw e; } }
       }
     }
-    async function requestAccounts(eth){
-      const accounts = await eth.request({ method:"eth_requestAccounts" });
-      if (!accounts || !accounts[0]) throw new Error("No account returned");
-      return accounts[0];
-    }
-
-    const state = { wallet: "" };
-
-    async function postJSON(path, body){
-      const res = await fetch(path, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
-      const data = await res.json().catch(()=> ({}));
-      if (!res.ok) throw new Error(data?.error || JSON.stringify(data));
-      return data;
-    }
-    async function getJSON(path){
-      const res = await fetch(path, { headers: { accept: "application/json" } });
-      const data = await res.json().catch(()=> ({}));
-      if (!res.ok) throw new Error(data?.error || JSON.stringify(data));
-      return data;
-    }
-
-    async function getTodayTotal(){
-      if (!/^0x[a-fA-F0-9]{40}$/.test(state.wallet || "")) return null;
-      try {
-        const data = await getJSON(`/.netlify/functions/claim-daily?wallet=${state.wallet}&mode=status`);
-        if (typeof data?.dayTotal === "number") return data.dayTotal;
-        return null;
-      } catch { return null; }
-    }
-
-    async function onConnect(){
+    async function connect(){
       const eth = await ensureEthereum();
       await ensurePolygon(eth);
-      const acct = await requestAccounts(eth);
-      state.wallet = acct;
-      setStatus(`Connected: ${short(acct)} • chain 137`);
-      const total = await getTodayTotal();
-      if (typeof total === "number") setPointsToday(`Points today: ${total} / 100`);
+      const accts = await eth.request({ method:"eth_requestAccounts" });
+      if(!accts[0]) throw new Error("No account");
+      state.wallet = accts[0];
+      setStatus(`Connected: ${short(state.wallet)} • chain 137`);
+      const tot = await getTodayTotal(); if (typeof tot==="number") setPointsToday(`Points today: ${tot} / 100`);
+    }
+    async function getTodayTotal(){
+      if (!isAddr(state.wallet)) return null;
+      const d = await getJSON(`/.netlify/functions/claim-daily?wallet=${state.wallet}&mode=status`);
+      return (typeof d?.dayTotal==="number") ? d.dayTotal : null;
     }
 
-    async function onLogAction(){
-      if (!/^0x[a-fA-F0-9]{40}$/.test(state.wallet || "")) { alert("Connect wallet first"); return; }
-      const map = {RECRUIT_MEMBER:20,COACH_MEMBER:15,CREATE_CONTENT:10,SHARE_CONTENT:5,VERIFY_ID:15,QUALITY_CONTROL:5,FINLIT_LESSON:15,REPORTER:15,DREAMCASTER:15,VOTE:10,BELIEF_CHAIN:20};
-      const id = $("#actionSelect")?.value || "RECRUIT_MEMBER";
-      const sponsor = ($("#sponsorInput")?.value || "").trim();
-      const points = map[id] || 0;
-
-      const btn = $("#logBtn"); const status = $("#actorStatus");
-      if (btn) btn.disabled = true;
-      status && (status.textContent = "Logging…");
+    // ------------------ sponsor validation (mandatory) ------------------
+    async function validateSponsor(addr){
+      if (!isAddr(addr)) return { ok:false, reason:"Invalid address format" };
       try {
-        const body = { wallet: state.wallet, action: id, points };
-        if (/^0x[a-fA-F0-9]{40}$/.test(sponsor)) body.sponsor = sponsor;
-        const out = await postJSON("/.netlify/functions/log-action", body);
-
-        const maxed = out.capped || (typeof out.dayTotal === "number" && out.dayTotal >= 100);
-        if (out.awarded > 0) {
-          status.textContent = `Logged ${id} (+${out.awarded}) • Total ${out.dayTotal}`;
-          try { window.confetti && window.confetti({ spread: 60, particleCount: 80, origin: { y: 0.7 } }); } catch(_){}
-        } else if (maxed) {
-          status.textContent = "Max Daily Pts Reached (100).";
-        } else {
-          status.textContent = "No points awarded.";
-        }
-        const total = await getTodayTotal();
-        if (typeof total === "number") setPointsToday(`Points today: ${total} / 100`);
-        $("#refreshLbBtn")?.click();
+        const res = await getJSON(`/.netlify/functions/admin-sponsors?sponsor=${addr}`);
+        // admin-sponsors returns {valid:boolean,...}
+        return res?.valid ? { ok:true } : { ok:false, reason: res?.reason || "Not an Anchor/Launcher" };
       } catch(e){
-        status && (status.textContent = "Log failed");
-        alert(e?.message || e);
-      } finally { if (btn) btn.disabled = false; }
+        return { ok:false, reason: e?.message || "Validation error" };
+      }
     }
 
-    // ---------- YouTube gating ----------
-    let player, duration=0, watched=0, playing=false, apiReady=false, fallbackStarted=false;
-    window.onYouTubeIframeAPIReady = function(){
-      apiReady = true;
-      const dbg = $("#claimDebug"); if (dbg) dbg.textContent = "YouTube API ready";
+    $("#checkSponsorBtn")?.addEventListener("click", async ()=>{
+      const s = ($("#sponsorInput")?.value||"").trim();
+      const out = await validateSponsor(s);
+      const el = $("#sponsorStatus");
+      if (out.ok) { el.className="small ok"; el.textContent="Sponsor valid ✅"; }
+      else { el.className="small bad"; el.textContent=`Invalid sponsor: ${out.reason||""}`; }
+    });
+
+    // ------------------ actions logging ------------------
+    $("#logBtn")?.addEventListener("click", async ()=>{
+      if (!isAddr(state.wallet)) { alert("Connect wallet first"); return; }
+      const id = $("#actionSelect")?.value || "RECRUIT_MEMBER";
+      const sponsor = ($("#sponsorInput")?.value||"").trim();
+      const ptsMap = {RECRUIT_MEMBER:20,COACH_MEMBER:15,CREATE_CONTENT:10,SHARE_CONTENT:5,VERIFY_ID:15,QUALITY_CONTROL:5,FINLIT_LESSON:15,REPORTER:15,DREAMCASTER:15,VOTE:10,BELIEF_CHAIN:20};
+      const pts = ptsMap[id]||0;
+
+      // MANDATORY sponsor
+      const vOut = await validateSponsor(sponsor);
+      const sEl = $("#sponsorStatus");
+      if (!vOut.ok){
+        if (sEl){ sEl.className="small bad"; sEl.textContent=`Invalid sponsor: ${vOut.reason||""}`; }
+        alert("Sponsor is required and must be an Anchor or Launcher.");
+        return;
+      } else { if (sEl){ sEl.className="small ok"; sEl.textContent="Sponsor valid ✅"; } }
+
+      const st=$("#actorStatus"); st.textContent="Logging…";
       try {
-        player = new YT.Player('video', {
-          events: {
-            onReady: (e)=>{ try { duration = e.target.getDuration() || 0; } catch(_){ duration = 0; } updateGate(); },
-            onStateChange: (e)=>{
-              if (e.data === YT.PlayerState.PLAYING) { playing = true; }
-              else { if (playing){ playing = false; updateGate(); } }
+        const out = await postJSON("/.netlify/functions/log-action", { wallet: state.wallet, action: id, points: pts, sponsor });
+        const maxed = out.capped || (typeof out.dayTotal === "number" && out.dayTotal >= 100);
+        if (out.awarded > 0){
+          st.textContent=`Logged ${id} (+${out.awarded}) • Total ${out.dayTotal}`;
+          try{ window.confetti && window.confetti({ spread:60, particleCount:80, origin:{y:0.7} }); }catch(_){}
+        } else if (maxed){
+          st.textContent="Max Daily Pts Reached (100).";
+        } else {
+          st.textContent="No points awarded.";
+        }
+        const tot = await getTodayTotal(); if (typeof tot==="number") setPointsToday(`Points today: ${tot} / 100`);
+        $("#refreshLbBtn")?.click();
+      } catch(e){ st.textContent="Log failed"; alert(e?.message||e); }
+    });
+
+    // ------------------ connect button ------------------
+    $("#connectBtn")?.addEventListener("click", connect);
+
+    // ------------------ daily video gating ------------------
+    let player, duration=0, watched=0, playing=false, apiReady=false, started=false;
+    const cover = $("#videoCover");
+    if (cover){
+      cover.addEventListener("click", ()=>{
+        started = true;
+        cover.style.display = "none"; // reveal the iframe; user can press play
+      });
+    }
+
+    window.onYouTubeIframeAPIReady = function(){
+      const dbg=$("#claimDebug"); apiReady=true; if(dbg) dbg.textContent="YouTube API ready";
+      try{
+        player = new YT.Player('video',{
+          events:{
+            onReady:(e)=>{ try{ duration=e.target.getDuration()||0; }catch(_){ duration=0; } updateGate(); },
+            onStateChange:(e)=>{
+              if (e.data===YT.PlayerState.PLAYING){ playing=true; }
+              else { if (playing){ playing=false; updateGate(); } }
             }
           }
         });
-      } catch (e) { if (dbg) dbg.textContent = "YT init error: " + (e?.message || e); }
+      }catch(e){ if(dbg) dbg.textContent="YT init error: "+(e?.message||e); }
     };
-    setInterval(()=>{ if (playing) { watched += 0.5; updateGate(); } }, 500);
-    setTimeout(()=>{
-      if (!apiReady && !fallbackStarted) {
-        fallbackStarted = true;
-        const dbg = $("#claimDebug"); if (dbg) dbg.textContent = "⚠️ YT API not ready — fallback timer started";
-        setInterval(()=>{ watched += 1; updateGate(); }, 1000);
-      }
-    }, 1500);
+
+    setInterval(()=>{ if (started && playing){ watched += 0.5; updateGate(); } }, 500);
 
     function eligibleNow(){
-      if (apiReady && player) {
-        let pct = 0; try { pct = duration ? (player.getCurrentTime()/Math.max(duration,1)) : 0; } catch(_){}
+      if (!started) return false; // must interact first
+      if (apiReady && player){
+        let pct=0; try{ pct = duration ? (player.getCurrentTime()/Math.max(duration,1)) : 0; }catch(_){}
         return (watched >= 60) && (pct >= 0.5);
       }
-      return watched >= 60; // fallback
+      // fallback time-only after interaction
+      return watched >= 60;
     }
     function updateGate(){
-      const btn = $("#claimBtn"); const status = $("#claimStatus");
-      if (!btn || !status) return;
+      const btn=$("#claimBtn"), status=$("#claimStatus");
+      if(!btn||!status) return;
       const ok = eligibleNow();
       btn.disabled = !ok;
-      let pct = 0; try { pct = duration ? (player.getCurrentTime()/Math.max(duration,1)) : 0; } catch(_){}
-      status.textContent = ok
-        ? "Eligible to claim ✅"
-        : `Watch at least 60s and 50% — watched ${Math.floor(watched)}s (${Math.floor(pct*100)}%)`;
+      let pct=0; try{ pct = player ? (player.getCurrentTime()/Math.max(duration||1,1)) : 0; }catch(_){}
+      status.textContent = ok ? "Eligible to claim ✅" : `Watch at least 60s and 50% — watched ${Math.floor(watched)}s (${Math.floor(pct*100)}%)`;
     }
 
-    async function onClaim(){
-      if (!/^0x[a-fA-F0-9]{40}$/.test(state.wallet || "")) { alert("Connect wallet first"); return; }
+    $("#claimBtn")?.addEventListener("click", async ()=>{
+      if (!isAddr(state.wallet)) { alert("Connect wallet first"); return; }
       if (!eligibleNow()) return;
-      const btn = $("#claimBtn"); const status = $("#claimStatus");
-      btn && (btn.disabled = true);
-      status && (status.textContent = "Claiming…");
-      try {
-        const out = await postJSON("/.netlify/functions/claim-daily", { wallet: state.wallet, actionId: "daily-video", meta: { watchedSeconds: Math.floor(watched) } });
-        if (out.alreadyClaimed) {
-          const mins = Math.ceil((out.nextEligibleMs || 0) / 60000);
-          status.textContent = `Already claimed — try again in ~${mins} min.`;
-        } else if (out.capped || (typeof out.dayTotal === "number" && out.dayTotal >= 100)) {
-          status.textContent = `Max Daily Pts Reached (100).`;
-        } else if (out.pointsAwarded > 0) {
-          status.textContent = `Claimed! +${out.pointsAwarded} (today ${out.dayTotal})`;
-          try { window.confetti && window.confetti({ spread: 70, particleCount: 120, origin: { y: 0.6 } }); } catch(_){}
-          const total = await getTodayTotal();
-          if (typeof total === "number") setPointsToday(`Points today: ${total} / 100`);
+      const btn=$("#claimBtn"), status=$("#claimStatus");
+      btn.disabled = true; status.textContent="Claiming…";
+      try{
+        const out = await postJSON("/.netlify/functions/claim-daily", { wallet: state.wallet, actionId:"daily-video", meta:{ watchedSeconds: Math.floor(watched) } });
+        if (out.alreadyClaimed){
+          const mins=Math.ceil((out.nextEligibleMs||0)/60000);
+          status.textContent=`Already claimed — try again in ~${mins} min.`;
+        } else if (out.capped || (typeof out.dayTotal==="number" && out.dayTotal>=100)){
+          status.textContent="Max Daily Pts Reached (100).";
+        } else if (out.pointsAwarded>0){
+          status.textContent=`Claimed! +${out.pointsAwarded} (today ${out.dayTotal})`;
+          try{ window.confetti && window.confetti({ spread:70, particleCount:120, origin:{ y:0.6 } }); }catch(_){}
+          const tot=await getTodayTotal(); if (typeof tot==="number") setPointsToday(`Points today: ${tot} / 100`);
           $("#refreshLbBtn")?.click();
         } else {
-          status.textContent = `No points awarded.`;
+          status.textContent="No points awarded.";
         }
-      } catch(e){
-        status && (status.textContent = "Claim failed");
-        alert(e?.message || e);
-      } finally { updateGate(); }
-    }
+      }catch(e){ status.textContent="Claim failed"; alert(e?.message||e); }
+      finally { updateGate(); }
+    });
 
-    // ---------- verifier ----------
-    async function onCheckFunctions(){
-      const el = $("#verifyStatus");
-      el && (el.textContent = "Calling blobs-selftest…");
-      try {
-        const r = await fetch("/.netlify/functions/blobs-selftest", { headers: { accept: "application/json" } });
-        el.textContent = "blobs-selftest: " + (await r.text()).slice(0,140);
-      } catch(e){ el.textContent = "blobs-selftest failed: " + (e?.message || e); }
-    }
-    async function onGetNonce(){
-      const el = $("#verifyStatus");
-      el && (el.textContent = "Requesting nonce…");
-      try {
-        const r = await fetch("/.netlify/functions/nonce", { headers: { accept: "application/json" } });
-        el.textContent = "nonce: " + (await r.text()).slice(0,140);
-      } catch(e){ el.textContent = "nonce failed: " + (e?.message || e); }
-    }
+    // ------------------ verifier ------------------
+    $("#checkFunctions")?.addEventListener("click", async ()=>{
+      const el=$("#verifyStatus"); el.textContent="Calling blobs-selftest…";
+      try{ const r=await fetch("/.netlify/functions/blobs-selftest",{headers:{accept:"application/json"}}); el.textContent="blobs-selftest: "+(await r.text()).slice(0,140); }
+      catch(e){ el.textContent="blobs-selftest failed: "+(e?.message||e); }
+    });
+    $("#getNonce")?.addEventListener("click", async ()=>{
+      const el=$("#verifyStatus"); el.textContent="Requesting nonce…";
+      try{ const r=await fetch("/.netlify/functions/nonce",{headers:{accept:"application/json"}}); el.textContent="nonce: "+(await r.text()).slice(0,140); }
+      catch(e){ el.textContent="nonce failed: "+(e?.message||e); }
+    });
 
-    // ---------- leaderboard ----------
+    // ------------------ leaderboard ------------------
     async function refreshLeaderboard(){
-      const body = $("#lbTableBody"); const lbStatus=$("#lbStatus"); const lbUpdated=$("#lbUpdated");
-      if (lbStatus) lbStatus.textContent = "Loading…";
-      try {
+      const body=$("#lbTableBody"), lbStatus=$("#lbStatus"), lbUpdated=$("#lbUpdated");
+      lbStatus.textContent="Loading…";
+      try{
         const data = await getJSON("/.netlify/functions/leaderboard");
-        if (data.ok && Array.isArray(data.entries)) {
-          if (body) body.innerHTML = data.entries.map((row, i)=>{
-            const addr=row[0]; const pts=row[1];
-            return `<tr><td>${i+1}</td><td>${addr.slice(0,6)}…${addr.slice(-4)}</td><td>${pts}</td></tr>`;
-          }).join("") || `<tr><td>—</td><td>—</td><td>—</td></tr>`;
-          if (lbUpdated) lbUpdated.textContent = "Updated " + new Date().toLocaleTimeString();
-          if (lbStatus) lbStatus.textContent = "";
-        } else {
-          if (lbStatus) lbStatus.textContent = data.error || "No data";
-        }
-      } catch(e){ if (lbStatus) lbStatus.textContent = "Leaderboard error"; }
+        if (data.ok && Array.isArray(data.entries)){
+          body.innerHTML = data.entries.map((row,i)=>`<tr><td>${i+1}</td><td>${row[0].slice(0,6)}…${row[0].slice(-4)}</td><td>${row[1]}</td></tr>`).join("") || `<tr><td>—</td><td>—</td><td>—</td></tr>`;
+          lbUpdated.textContent="Updated "+new Date().toLocaleTimeString();
+          lbStatus.textContent="";
+        } else { lbStatus.textContent = data.error || "No data"; }
+      }catch(e){ lbStatus.textContent="Leaderboard error"; }
     }
+    $("#refreshLbBtn")?.addEventListener("click", refreshLeaderboard);
+    refreshLeaderboard();
 
-    // ---------- bind ----------
-    window.addEventListener("DOMContentLoaded", async ()=>{
-      $("#connectBtn")?.addEventListener("click", onConnect);
-      $("#logBtn")?.addEventListener("click", onLogAction);
-      $("#claimBtn")?.addEventListener("click", onClaim);
-      $("#checkFunctions")?.addEventListener("click", onCheckFunctions);
-      $("#getNonce")?.addEventListener("click", onGetNonce);
-      $("#refreshLbBtn")?.addEventListener("click", refreshLeaderboard);
-      refreshLeaderboard();
-
-      // verify authorized accounts; don't auto-show connected unless approved
-      try {
-        if (window.ethereum) {
-          const accts = await window.ethereum.request({ method: "eth_accounts" });
+    // --------- important: NO auto-connect on load ---------
+    // We only check authorized accounts silently; no MetaMask popups.
+    (async ()=>{
+      try{
+        if (window.ethereum){
+          const accts = await window.ethereum.request({ method:"eth_accounts" });
           const acct = Array.isArray(accts) && accts[0] ? accts[0] : "";
-          if (acct) {
+          if (acct){
             state.wallet = acct;
             setStatus(`Connected: ${short(acct)} • chain 137`);
-            const total = await getTodayTotal();
-            if (typeof total === "number") setPointsToday(`Points today: ${total} / 100`);
+            const tot = await getTodayTotal(); if (typeof tot==="number") setPointsToday(`Points today: ${tot} / 100`);
           } else {
             setStatus("Not connected");
           }
         }
-      } catch {}
+      }catch{}
+    })();
 
-    });
+    // connect button
+    $("#connectBtn")?.addEventListener("click", connect);
   })();
   </script>
 </body>
