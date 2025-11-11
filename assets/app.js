@@ -1,10 +1,8 @@
 // /assets/app.js  (non-module; binds handlers itself)
 (function(){
-  // mark ready for index.html badge
   window.__APP_READY__ = false;
 
-  // ---------- config ----------
-  const CHAIN_ID_HEX = "0x89"; // Polygon mainnet
+  const CHAIN_ID_HEX = "0x89";
   const POLYGON_PARAMS = {
     chainId: CHAIN_ID_HEX,
     chainName: "Polygon Mainnet",
@@ -13,14 +11,11 @@
     blockExplorerUrls: ["https://polygonscan.com"]
   };
 
-  // ---------- DOM helpers ----------
   const $ = (s) => document.querySelector(s);
   const short = (a) => (a ? a.slice(0,6) + "…" + a.slice(-4) : "");
-
   function setStatus(t){ const el=$("#connStatus"); if(el) el.textContent=t; }
   function setPointsToday(t){ const el=$("#pointsToday"); if(el) el.textContent=t; }
 
-  // ---------- wallet helpers ----------
   async function ensureEthereum(){
     if (!window.ethereum) { alert("MetaMask is required."); throw new Error("MetaMask not found"); }
     return window.ethereum;
@@ -43,10 +38,8 @@
     return accounts[0];
   }
 
-  // ---------- state ----------
   const state = { wallet: localStorage.getItem("walletAddress") || "" };
 
-  // ---------- API helpers ----------
   async function postJSON(path, body){
     const res = await fetch(path, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
     const data = await res.json().catch(()=> ({}));
@@ -60,17 +53,15 @@
     return data;
   }
 
-  // ---------- Points: today total (from claim-daily GET) ----------
   async function getTodayTotal(){
     if (!/^0x[a-fA-F0-9]{40}$/.test(state.wallet || "")) return null;
     try {
-      const data = await getJSON(`/.netlify/functions/claim-daily?wallet=${state.wallet}`);
+      const data = await getJSON(`/.netlify/functions/claim-daily?wallet=${state.wallet}&mode=status`);
       if (typeof data?.dayTotal === "number") return data.dayTotal;
       return null;
     } catch { return null; }
   }
 
-  // ---------- UI actions ----------
   async function onConnect(){
     const eth = await ensureEthereum();
     await ensurePolygon(eth);
@@ -112,15 +103,11 @@
     } catch(e){
       status && (status.textContent = "Log failed");
       alert(e?.message || e);
-    } finally {
-      if (btn) btn.disabled = false;
-    }
+    } finally { if (btn) btn.disabled = false; }
   }
 
-  // ---------- YouTube gating ----------
+  // --- YouTube gating (unchanged logic) ---
   let player, duration=0, watched=0, playing=false, apiReady=false, fallbackStarted=false;
-
-  // YT API callback
   window.onYouTubeIframeAPIReady = function(){
     apiReady = true;
     const dbg = $("#claimDebug"); if (dbg) dbg.textContent = "YouTube API ready";
@@ -130,22 +117,13 @@
           onReady: (e)=>{ try { duration = e.target.getDuration() || 0; } catch(_){ duration = 0; } updateGate(); },
           onStateChange: (e)=>{
             if (e.data === YT.PlayerState.PLAYING) { playing = true; }
-            else {
-              if (playing) { playing = false; updateGate(); }
-            }
+            else { if (playing){ playing = false; updateGate(); } }
           }
         }
       });
-    } catch (e) {
-      if (dbg) dbg.textContent = "YT init error: " + (e?.message || e);
-    }
+    } catch (e) { if (dbg) dbg.textContent = "YT init error: " + (e?.message || e); }
   };
-
-  setInterval(()=>{
-    if (playing) { watched += 0.5; updateGate(); }
-  }, 500);
-
-  // If API never comes, fallback time-only
+  setInterval(()=>{ if (playing) { watched += 0.5; updateGate(); } }, 500);
   setTimeout(()=>{
     if (!apiReady && !fallbackStarted) {
       fallbackStarted = true;
@@ -156,13 +134,11 @@
 
   function eligibleNow(){
     if (apiReady && player) {
-      let pct = 0;
-      try { pct = duration ? (player.getCurrentTime()/Math.max(duration,1)) : 0; } catch(_){}
+      let pct = 0; try { pct = duration ? (player.getCurrentTime()/Math.max(duration,1)) : 0; } catch(_){}
       return (watched >= 60) && (pct >= 0.5);
     }
-    return watched >= 60; // fallback (API blocked)
+    return watched >= 60;
   }
-
   function updateGate(){
     const btn = $("#claimBtn"); const status = $("#claimStatus");
     if (!btn || !status) return;
@@ -175,6 +151,7 @@
   }
 
   async function onClaim(){
+    if (!/^0x[a-fA-F0-9]{40}$/.test(state.wallet || "")) { alert("Connect wallet first"); return; }
     if (!eligibleNow()) return;
     const btn = $("#claimBtn"); const status = $("#claimStatus");
     btn && (btn.disabled = true);
@@ -198,12 +175,9 @@
     } catch(e){
       status && (status.textContent = "Claim failed");
       alert(e?.message || e);
-    } finally {
-      updateGate();
-    }
+    } finally { updateGate(); }
   }
 
-  // ---------- verifier ----------
   async function onCheckFunctions(){
     const el = $("#verifyStatus");
     el && (el.textContent = "Calling blobs-selftest…");
@@ -221,7 +195,6 @@
     } catch(e){ el.textContent = "nonce failed: " + (e?.message || e); }
   }
 
-  // ---------- leaderboard ----------
   async function refreshLeaderboard(){
     const body = $("#lbTableBody"); const lbStatus=$("#lbStatus"); const lbUpdated=$("#lbUpdated");
     if (lbStatus) lbStatus.textContent = "Loading…";
@@ -237,16 +210,11 @@
       } else {
         if (lbStatus) lbStatus.textContent = data.error || "No data";
       }
-    } catch(e){
-      if (lbStatus) lbStatus.textContent = "Leaderboard error";
-    }
+    } catch(e){ if (lbStatus) lbStatus.textContent = "Leaderboard error"; }
   }
 
-  // ---------- bind on load ----------
-  window.addEventListener("DOMContentLoaded", ()=>{
-    // show JS badge
-    const badge = $("#jsStatus"); if (badge) badge.style.display = "inline-block";
-
+  // ---- bind on load ----
+  window.addEventListener("DOMContentLoaded", async ()=>{
     $("#connectBtn")?.addEventListener("click", onConnect);
     $("#logBtn")?.addEventListener("click", onLogAction);
     $("#claimBtn")?.addEventListener("click", onClaim);
@@ -255,9 +223,29 @@
     $("#refreshLbBtn")?.addEventListener("click", refreshLeaderboard);
     refreshLeaderboard();
 
-    if (state.wallet) setStatus(`Connected: ${short(state.wallet)} • chain 137`);
-    getTodayTotal().then(t => { if (typeof t === "number") setPointsToday(`Points today: ${t} / 100`); });
+    // Don’t trust cached localStorage — verify with eth_accounts
+    try {
+      if (window.ethereum) {
+        const accts = await window.ethereum.request({ method: "eth_accounts" });
+        const acct = Array.isArray(accts) && accts[0] ? accts[0] : "";
+        if (acct) {
+          state.wallet = acct;
+          localStorage.setItem("walletAddress", acct);
+          setStatus(`Connected: ${short(acct)} • chain 137`);
+          const total = await getTodayTotal();
+          if (typeof total === "number") setPointsToday(`Points today: ${total} / 100`);
+        } else {
+          // not authorized → clear stale cache
+          state.wallet = "";
+          localStorage.removeItem("walletAddress");
+          setStatus("Not connected");
+        }
+      }
+    } catch {
+      // ignore; user will click Connect
+    }
 
     window.__APP_READY__ = true;
+    const badge = $("#jsStatus"); if (badge) badge.style.display = "inline-block";
   });
 })();
