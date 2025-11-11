@@ -5,14 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>DreamPlay Personal Natural Resources (PNR) Digital Miner</title>
   <meta name="description" content="DreamPlay PNR Digital Miner — earn OOM points daily on Polygon." />
-
-  <!-- Favicons (already in your repo) -->
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/favicon-180.png">
   <link rel="icon" type="image/png" sizes="512x512" href="/favicon-512.png">
-
-  <!-- Optional stylesheet (exists in repo) -->
-  <link rel="stylesheet" href="/assets/styles.css">
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif; margin: 0; padding: 0 16px 48px; }
     header { display:flex; gap:12px; align-items:center; padding:16px 0; border-bottom: 1px solid rgba(0,0,0,.08); }
@@ -34,7 +29,7 @@
       </div>
     </header>
 
-    <!-- Controls -->
+    <!-- Wallet -->
     <section id="wallet" style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
       <button id="connectBtn"
               onclick="onConnectClick()"
@@ -57,13 +52,13 @@
       </button>
     </section>
 
-    <!-- Optional: simple readouts -->
+    <!-- Readout -->
     <section id="readouts" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
       <div id="lastResult" style="opacity:.9"></div>
     </section>
   </main>
 
-  <!-- Keep this at the very end of <body> so onclick handlers are available -->
+  <!-- Important: load JS after the buttons -->
   <script src="/assets/app.js"></script>
 </body>
 </html>
