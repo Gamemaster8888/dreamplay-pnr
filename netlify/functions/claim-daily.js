@@ -1,3 +1,4 @@
+// netlify/functions/claim-daily.js
 // --- DreamPlay daily claim: rolling 24h + 100/day cap ---
 // GET  => status ONLY (NO mutations)
 // POST => attempt to claim (mutates state if eligible)
@@ -14,7 +15,8 @@ function resp(status, body) {
 }
 
 const ROLLING_WINDOW_MS = 24 * 60 * 60 * 1000;
-const POINTS_PER_TASK = 100;
+// DAILY VIDEO POINTS:
+const POINTS_PER_TASK = 15;
 
 function todayStr(d=new Date()) { return d.toISOString().slice(0,10); }
 function nowMs(){ return Date.now(); }
@@ -36,7 +38,6 @@ async function readStore(wallet) {
       return { type: 'blobs', store, key, json };
     }
   } catch(_) {}
-  // memory fallback
   if (!globalThis.__CLAIMS) globalThis.__CLAIMS = {};
   globalThis.__CLAIMS[wallet.toLowerCase()] ||= { lastClaimAt: 0, dayTotals: {} };
   return { type: 'memory', json: globalThis.__CLAIMS[wallet.toLowerCase()] };
@@ -81,13 +82,8 @@ exports.handler = async (event) => {
   const today = todayStr();
   const todayTotal = Number(state.dayTotals[today] || 0);
 
-  // GET: status only, no writes/mutations
+  // GET: status only
   if (event.httpMethod === 'GET') {
-    const q = event.queryStringParameters || {};
-    const mode = (q.mode || '').toLowerCase(); // support explicit ?mode=status
-    if (mode !== 'status') {
-      // even if no mode supplied, NEVER mutate on GET
-    }
     return resp(200, {
       ok: true,
       mode: 'status',
