@@ -141,10 +141,12 @@
       actorStatus && (actorStatus.textContent = 'Logging…');
       try {
         const res = await App.logAction(actionId, points, sponsor);
+        const maxed = res.capped || (typeof res.dayTotal === 'number' && res.dayTotal >= 100);
         if (res.awarded > 0) {
           actorStatus.textContent = `Logged ${actionId} (+${res.awarded}) • Total ${res.dayTotal}`;
-        } else if (res.capped) {
-          actorStatus.textContent = `Daily cap reached (100).`;
+          try { window.confetti && window.confetti({ spread: 60, particleCount: 80, origin: { y: 0.7 } }); } catch(_){}
+        } else if (maxed) {
+          actorStatus.textContent = `Max Daily Pts Reached (100).`;
         } else {
           actorStatus.textContent = `No points awarded.`;
         }
@@ -177,13 +179,12 @@
       }
     });
 
-    // ---- Daily Video gating + claim (BOTH 60s AND 50%) ----
+    // ---- Daily Video gating (>=60s AND >=50% if API; else fallback time-only) ----
     const claimBtn = $('#claimBtn');
     const claimStatus = $('#claimStatus');
     const claimDebug = $('#claimDebug');
     const setDebug = (msg) => { if (claimDebug) claimDebug.textContent = msg; };
 
-    // replace any old listeners
     if (claimBtn) {
       const fresh = claimBtn.cloneNode(true);
       claimBtn.replaceWith(fresh);
@@ -194,10 +195,12 @@
     let apiReady = false, fallbackStarted = false;
 
     function eligibleNow(){
-      let percent = 0;
-      try { percent = duration ? (player.getCurrentTime() / Math.max(duration, 1)) : 0; } catch(_) {}
-      // NEW RULE: must meet BOTH thresholds
-      return (watched >= 60) && (percent >= 0.5);
+      if (apiReady && player) {
+        let percent = 0;
+        try { percent = duration ? (player.getCurrentTime() / Math.max(duration, 1)) : 0; } catch(_) {}
+        return (watched >= 60) && (percent >= 0.5);
+      }
+      return watched >= 60; // fallback (API blocked)
     }
     function updateGate(){
       if (!claimBtnFresh || !claimStatus) return;
@@ -217,7 +220,7 @@
       let t = 0;
       const iv = setInterval(()=>{
         t += 1; watched = Math.max(watched, t); updateGate();
-        if (t >= 120 || apiReady) { clearInterval(iv); } // allow up to 2m fallback
+        if (t >= 120 || apiReady) { clearInterval(iv); }
       }, 1000);
     }
     window.addEventListener('click', ()=> setTimeout(startFallbackIfNeeded, 1200), { once: true });
@@ -254,15 +257,17 @@
       claimStatus.textContent = 'Claiming…';
       try {
         const resp = await App.postClaim('daily-video', { watchedSeconds: Math.floor(watched) });
+
+        // UPDATED MESSAGES (Max Daily Pts Reached)
         if (resp.alreadyClaimed) {
           const mins = Math.ceil((resp.nextEligibleMs || 0) / 60000);
           claimStatus.textContent = `Already claimed — try again in ~${mins} min.`;
-        } else if (resp.capped) {
-          claimStatus.textContent = `Daily cap reached (100 pts).`;
+        } else if (resp.capped || (typeof resp.dayTotal === "number" && resp.dayTotal >= 100)) {
+          claimStatus.textContent = `Max Daily Pts Reached (100).`;
         } else if (resp.pointsAwarded > 0) {
           claimStatus.textContent = `Claimed! +${resp.pointsAwarded} (today ${resp.dayTotal})`;
           try { window.confetti && window.confetti({ spread: 70, particleCount: 120, origin: { y: 0.6 } }); } catch(_){}
-          await refreshPointsToday();
+          await refreshPointsToday?.();
           document.getElementById('refreshLbBtn')?.click();
         } else {
           claimStatus.textContent = `No points awarded.`;
@@ -291,8 +296,12 @@
             return `<tr><td>${idx+1}</td><td>${s}</td><td>${pts}</td></tr>`;
           }).join('') || '<tr><td>—</td><td>—</td><td>—</td></tr>';
           lbUpdated.textContent = 'Last updated ' + new Date().toLocaleTimeString();
+        } else if (data && !data.ok) {
+          lbStatus.textContent = data.error || 'Error';
+        } else {
+          lbStatus.textContent = 'No data';
         }
-        lbStatus.textContent = '';
+        if (data?.ok) lbStatus.textContent = '';
       } catch(e){
         lbStatus.textContent = 'Leaderboard error';
       }
