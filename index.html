@@ -3,16 +3,26 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>DreamPlay Personal Natural Resource (PNR) Miner</title>
+  <title>DreamPlay Personal Natural Resources (PNR) Digital Miner</title>
   <link rel="stylesheet" href="/assets/styles.css" />
-  <!-- ethers v6 UMD is fine to keep; we don't require it in this page JS -->
   <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js" defer></script>
+  <style>
+    .small { opacity:.85; font-size:.92rem; }
+    .muted { opacity:.7; }
+  </style>
 </head>
 <body>
   <div class="container">
-    <div class="row" style="justify-content:space-between">
-      <h1>PNR Miner</h1>
+    <div class="row" style="justify-content:space-between; align-items:center">
+      <div class="row" style="gap:10px; align-items:center">
+        <img src="/assets/dreamplay-logo.png" alt="DreamPlay" style="height:40px; width:auto; border-radius:8px" onerror="this.style.display='none'">
+        <h1 style="margin:0">DreamPlay Personal Natural Resources (PNR) Digital Miner</h1>
+      </div>
       <a class="badge-link" href="/dgnn/">Go to DGNN →</a>
+    </div>
+
+    <div class="muted" style="margin:.25rem 0 1rem">
+      Your sponsor must be an Anchor or someone who has launched via the DreamPlay Token Factory.
     </div>
 
     <div class="card">
@@ -20,11 +30,12 @@
         <button id="connectMetaMask">Connect with MetaMask</button>
         <span id="connectStatus" class="small"></span>
       </div>
+      <div class="small muted" id="pointsToday"></div>
     </div>
 
     <div class="card">
       <h2>Actions</h2>
-      <div class="row">
+      <div class="row" style="gap:.5rem; flex-wrap:wrap">
         <select id="actionSelect" class="input">
           <option value="RECRUIT_MEMBER">Recruit a New Member (+20 pts)</option>
           <option value="COACH_MEMBER">Coach a New Member (+15 pts)</option>
@@ -38,28 +49,10 @@
           <option value="VOTE">Vote (+10 pts)</option>
           <option value="BELIEF_CHAIN">Join the Belief Chain (+20 pts)</option>
         </select>
-        <input id="sponsorInput" class="input" placeholder="Optional: sponsor / referral code" />
+        <input id="sponsorInput" class="input" placeholder="Optional: sponsor address" />
         <button id="logBtn">Log Action</button>
       </div>
       <div id="actorStatus" class="small"></div>
-
-      <div class="small" style="margin-top:8px">Action catalog</div>
-      <table class="table">
-        <thead><tr><th>Action</th><th>Points</th><th>Description</th></tr></thead>
-        <tbody>
-          <tr><td>Recruit a New Member</td><td>20</td><td class="small">Expands the DreamPlay community; new participants create network value.</td></tr>
-          <tr><td>Coach a New Member</td><td>15</td><td class="small">Provides mentorship, ensuring new entrants integrate effectively.</td></tr>
-          <tr><td>Create Content</td><td>10</td><td class="small">Generates intellectual and cultural assets for the ecosystem.</td></tr>
-          <tr><td>Share Content</td><td>5</td><td class="small">Distributes knowledge and amplifies visibility.</td></tr>
-          <tr><td>Verify ID</td><td>15</td><td class="small">Strengthens trust and compliance within the network.</td></tr>
-          <tr><td>Quality Control</td><td>5</td><td class="small">Supports integrity and consistency in project delivery.</td></tr>
-          <tr><td>Financial Literacy Lesson</td><td>15</td><td class="small">Expands community wealth intelligence and collective economic IQ.</td></tr>
-          <tr><td>Reporter</td><td>15</td><td class="small">Documents and narrates community progress, preserving history.</td></tr>
-          <tr><td>DreamCaster</td><td>15</td><td class="small">Hosts or broadcasts live experiences, growing the DreamPlay media loop.</td></tr>
-          <tr><td>Vote</td><td>10</td><td class="small">Participates in governance, ensuring distributed decision-making.</td></tr>
-          <tr><td>Join the Belief Chain</td><td>20</td><td class="small">Commits to shared mission and value alignment within the Dream Network.</td></tr>
-        </tbody>
-      </table>
     </div>
 
     <div class="card">
@@ -72,9 +65,10 @@
           referrerpolicy="strict-origin-when-cross-origin" allowfullscreen>
         </iframe>
       </div>
-      <div class="row">
+      <div class="row" style="gap:.5rem; flex-wrap:wrap">
         <button id="claimBtn" disabled>Claim Daily Points</button>
-        <span id="claimStatus" class="small"><br><span id="claimDebug" class="small"></span>Watch at least 60s or 50% to enable claim.</span>
+        <span id="claimStatus" class="small">Watch at least <b>60s and 50%</b> to enable claim.</span>
+        <span id="claimDebug" class="small muted"></span>
       </div>
     </div>
 
@@ -95,7 +89,7 @@
       </div>
       <table class="table">
         <thead><tr><th>#</th><th>Address</th><th>Points</th></tr></thead>
-        <tbody id="lbTableBody"><tr><td>1</td><td>0x1234…abcd</td><td>42</td></tr></tbody>
+        <tbody id="lbTableBody"><tr><td>—</td><td>—</td><td>—</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -103,7 +97,7 @@
   <!-- YouTube API -->
   <script src="https://www.youtube.com/iframe_api"></script>
 
-  <!-- Page wiring: imports App (ESM) and binds UI -->
+  <!-- Page wiring -->
   <script type="module">
     import { App } from '/assets/app.js';
 
@@ -112,16 +106,31 @@
     // ---- MetaMask Connect ----
     const statusEl = $('#connectStatus');
     const connectBtn = $('#connectMetaMask');
-    if (connectBtn) connectBtn.addEventListener('click', () => App.connectMetaMask(statusEl));
+    const pointsTodayEl = $('#pointsToday');
 
-    // ---- Actions → server (global 100/day cap enforced in backend) ----
+    async function refreshPointsToday() {
+      try {
+        const total = await App.getTodayTotal();
+        if (typeof total === 'number') pointsTodayEl.textContent = `Points today: ${total} / 100`;
+      } catch {}
+    }
+
+    if (connectBtn) connectBtn.addEventListener('click', async () => {
+      try {
+        await App.connectMetaMask(statusEl);
+        await refreshPointsToday();
+      } catch (e) {
+        alert(e?.message || e);
+      }
+    });
+
+    // ---- Actions → server ----
     const POINTS = {
       RECRUIT_MEMBER: 20, COACH_MEMBER: 15, CREATE_CONTENT: 10, SHARE_CONTENT: 5,
       VERIFY_ID: 15, QUALITY_CONTROL: 5, FINLIT_LESSON: 15, REPORTER: 15,
       DREAMCASTER: 15, VOTE: 10, BELIEF_CHAIN: 20
     };
-    const logBtn = $('#logBtn');
-    if (logBtn) logBtn.addEventListener('click', async () => {
+    $('#logBtn')?.addEventListener('click', async () => {
       const addr = App.state.address || localStorage.getItem('walletAddress');
       if (!addr) { alert('Connect wallet first'); return; }
       const actionId = ($('#actionSelect')?.value) || 'RECRUIT_MEMBER';
@@ -139,9 +148,7 @@
         } else {
           actorStatus.textContent = `No points awarded.`;
         }
-        // confetti
-        try { window.confetti && window.confetti({ spread: 60, particleCount: 80, origin: { y: 0.7 } }); } catch(_){}
-        // refresh leaderboard
+        await refreshPointsToday();
         document.getElementById('refreshLbBtn')?.click();
       } catch (e) {
         actorStatus && (actorStatus.textContent = 'Log failed');
@@ -149,14 +156,13 @@
       }
     });
 
-    // ---- Verifier buttons (unchanged) ----
+    // ---- Verifier buttons ----
     const verifyStatus = $('#verifyStatus');
     $('#checkFunctions')?.addEventListener('click', async () => {
       verifyStatus && (verifyStatus.textContent = 'Calling blobs-selftest…');
       try {
         const res = await fetch('/.netlify/functions/blobs-selftest', { headers: { accept: 'application/json' } });
-        const text = await res.text();
-        verifyStatus.textContent = 'blobs-selftest: ' + text.slice(0, 140) + (text.length>140?'…':'');
+        verifyStatus.textContent = 'blobs-selftest: ' + (await res.text()).slice(0,140);
       } catch(e) {
         verifyStatus.textContent = 'blobs-selftest failed: ' + (e?.message || e);
       }
@@ -165,23 +171,19 @@
       verifyStatus && (verifyStatus.textContent = 'Requesting nonce…');
       try {
         const res = await fetch('/.netlify/functions/nonce', { headers: { accept: 'application/json' } });
-        const text = await res.text();
-        verifyStatus.textContent = 'nonce: ' + text.slice(0, 140) + (text.length>140?'…':'');
+        verifyStatus.textContent = 'nonce: ' + (await res.text()).slice(0,140);
       } catch(e) {
         verifyStatus.textContent = 'nonce failed: ' + (e?.message || e);
       }
     });
 
-    // ---- Daily Video gating + claim (kept same UX, calls backend claim) ----
+    // ---- Daily Video gating + claim (BOTH 60s AND 50%) ----
     const claimBtn = $('#claimBtn');
     const claimStatus = $('#claimStatus');
     const claimDebug = $('#claimDebug');
-    function setDebug(msg){ if (claimDebug) claimDebug.textContent = msg; }
-    if (claimStatus && !claimStatus.textContent) {
-      claimStatus.textContent = 'Watch at least 60s or 50% to enable claim.';
-    }
+    const setDebug = (msg) => { if (claimDebug) claimDebug.textContent = msg; };
 
-    // prevent duplicate listeners
+    // replace any old listeners
     if (claimBtn) {
       const fresh = claimBtn.cloneNode(true);
       claimBtn.replaceWith(fresh);
@@ -191,14 +193,21 @@
     let player, duration = 0, watched = 0, playing = false, lastTick = 0;
     let apiReady = false, fallbackStarted = false;
 
-    function enableIfEligible(){
+    function eligibleNow(){
       let percent = 0;
       try { percent = duration ? (player.getCurrentTime() / Math.max(duration, 1)) : 0; } catch(_) {}
-      const eligible = (watched >= 60) || (percent >= 0.5);
-      if (claimBtnFresh) claimBtnFresh.disabled = !eligible;
-      if (claimStatus) claimStatus.textContent = eligible
+      // NEW RULE: must meet BOTH thresholds
+      return (watched >= 60) && (percent >= 0.5);
+    }
+    function updateGate(){
+      if (!claimBtnFresh || !claimStatus) return;
+      const ok = eligibleNow();
+      claimBtnFresh.disabled = !ok;
+      let percent = 0;
+      try { percent = duration ? (player.getCurrentTime() / Math.max(duration, 1)) : 0; } catch(_) {}
+      claimStatus.textContent = ok
         ? 'Eligible to claim ✅'
-        : `Watch at least 60s or 50% — watched ${Math.floor(watched)}s (${Math.floor(percent*100)}%)`;
+        : `Watch at least 60s and 50% — watched ${Math.floor(watched)}s (${Math.floor(percent*100)}%)`;
     }
 
     function startFallbackIfNeeded(){
@@ -207,26 +216,26 @@
       setDebug('⚠️ YT API not ready — fallback timer started');
       let t = 0;
       const iv = setInterval(()=>{
-        t += 1; watched = Math.max(watched, t); enableIfEligible();
-        if (t >= 60 || apiReady) { clearInterval(iv); }
+        t += 1; watched = Math.max(watched, t); updateGate();
+        if (t >= 120 || apiReady) { clearInterval(iv); } // allow up to 2m fallback
       }, 1000);
     }
-    window.addEventListener('click', ()=> setTimeout(startFallbackIfNeeded, 1500), { once: true });
+    window.addEventListener('click', ()=> setTimeout(startFallbackIfNeeded, 1200), { once: true });
 
     window.onYouTubeIframeAPIReady = function(){
       apiReady = true; setDebug('YouTube API ready');
       try {
         player = new YT.Player('video', {
           events: {
-            onReady: (e)=>{ try { duration = e.target.getDuration() || 0; } catch(_){ duration = 0; } setDebug('YT Player ready; duration=' + duration); enableIfEligible(); },
+            onReady: (e)=>{ try { duration = e.target.getDuration() || 0; } catch(_){ duration = 0; } setDebug('YT Player ready; duration=' + duration); updateGate(); },
             onStateChange: (e)=>{
-              const state = e.data;
-              if (state === YT.PlayerState.PLAYING) { playing = true; lastTick = performance.now(); }
-              else { if (playing){ const now = performance.now(); watched += (now - lastTick)/1000; } playing = false; enableIfEligible(); }
+              const st = e.data;
+              if (st === YT.PlayerState.PLAYING) { playing = true; lastTick = performance.now(); }
+              else { if (playing){ const now = performance.now(); watched += (now - lastTick)/1000; } playing = false; updateGate(); }
             }
           }
         });
-      } catch (e) { setDebug('YT Player init error: ' + (e?.message || e)); }
+      } catch (e) { setDebug('YT init error: ' + (e?.message || e)); }
     };
 
     setInterval(()=>{
@@ -235,42 +244,44 @@
         const delta = (now - lastTick)/1000;
         lastTick = now; watched += delta;
         try { duration = player.getDuration() || duration; } catch(_){}
-        enableIfEligible();
+        updateGate();
       }
     }, 500);
 
     if (claimBtnFresh) claimBtnFresh.addEventListener('click', async () => {
+      if (!eligibleNow()) return; // double-guard
       claimBtnFresh.disabled = true;
-      if (claimStatus) claimStatus.textContent = 'Claiming…';
+      claimStatus.textContent = 'Claiming…';
       try {
-        let percent = 0;
-        try { percent = duration ? Math.min(1, player.getCurrentTime()/Math.max(duration, 1)) : (watched ? Math.min(1, watched/60) : 0); } catch(_) {
-          percent = watched ? Math.min(1, watched/60) : 0;
-        }
-        const resp = await App.postClaim('daily-video', { watchedSeconds: Math.floor(watched), progress: percent });
+        const resp = await App.postClaim('daily-video', { watchedSeconds: Math.floor(watched) });
         if (resp.alreadyClaimed) {
           const mins = Math.ceil((resp.nextEligibleMs || 0) / 60000);
           claimStatus.textContent = `Already claimed — try again in ~${mins} min.`;
         } else if (resp.capped) {
           claimStatus.textContent = `Daily cap reached (100 pts).`;
-        } else {
+        } else if (resp.pointsAwarded > 0) {
           claimStatus.textContent = `Claimed! +${resp.pointsAwarded} (today ${resp.dayTotal})`;
           try { window.confetti && window.confetti({ spread: 70, particleCount: 120, origin: { y: 0.6 } }); } catch(_){}
+          await refreshPointsToday();
           document.getElementById('refreshLbBtn')?.click();
+        } else {
+          claimStatus.textContent = `No points awarded.`;
         }
       } catch (e) {
         claimStatus.textContent = 'Claim failed';
         alert('Claim failed: ' + (e?.message || e));
       } finally {
-        enableIfEligible();
+        updateGate();
       }
     });
 
-    // ---- Leaderboard (kept same, calls your function) ----
+    // ---- Leaderboard ----
     async function refreshLeaderboard(){
       const lbBody = document.getElementById('lbTableBody');
       const lbUpdated = document.getElementById('lbUpdated');
+      const lbStatus = document.getElementById('lbStatus');
       try {
+        lbStatus.textContent = 'Loading…';
         const res = await fetch('/.netlify/functions/leaderboard', { headers: { accept: 'application/json' } });
         const data = await res.json().catch(()=>({}));
         if (data && data.ok && Array.isArray(data.entries) && lbBody) {
@@ -279,17 +290,23 @@
             const s = addr ? (addr.slice(0,6)+'…'+addr.slice(-4)) : '—';
             return `<tr><td>${idx+1}</td><td>${s}</td><td>${pts}</td></tr>`;
           }).join('') || '<tr><td>—</td><td>—</td><td>—</td></tr>';
-          if (lbUpdated) lbUpdated.textContent = 'Last updated ' + new Date().toLocaleTimeString();
+          lbUpdated.textContent = 'Last updated ' + new Date().toLocaleTimeString();
         }
+        lbStatus.textContent = '';
       } catch(e){
-        if (lbUpdated) lbUpdated.textContent = 'Leaderboard error';
+        lbStatus.textContent = 'Leaderboard error';
       }
     }
     refreshLeaderboard();
     document.getElementById('refreshLbBtn')?.addEventListener('click', refreshLeaderboard);
+
+    // Auto-show points if wallet already cached
+    if (localStorage.getItem('walletAddress')) {
+      statusEl.textContent = `Connected: ${App.short(localStorage.getItem('walletAddress'))} • chain 137`;
+      await refreshPointsToday();
+    }
   </script>
 
-  <!-- confetti -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 </body>
 </html>
