@@ -17,6 +17,7 @@
     .sub { opacity:.8; font-size:.95rem; margin-top:4px; }
     section { margin-top: 20px; }
     button { font-weight: 600; }
+    .badge { padding:2px 8px; border-radius:999px; font-size:.8rem; background:#eef; color:#223; }
   </style>
 </head>
 <body>
@@ -32,21 +33,21 @@
     <!-- Wallet -->
     <section id="wallet" style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
       <button id="connectBtn"
-              onclick="onConnectClick()"
               style="padding:10px 16px;border:none;border-radius:10px;background:#6b46c1;color:#fff;cursor:pointer;">
         Connect with MetaMask
       </button>
       <span id="connStatus" style="opacity:.8">Not connected</span>
+      <span id="jsStatus" class="badge" style="display:none;">JS loaded</span>
     </section>
 
     <!-- Actions -->
     <section id="actions" style="display:flex;gap:.75rem;flex-wrap:wrap">
-      <button onclick="onLogRecruitClick()"
+      <button id="btnRecruit"
               style="padding:10px 16px;border:none;border-radius:10px;background:#4CAF50;color:#fff;cursor:pointer;">
         Recruit a New Member (+20 pts)
       </button>
 
-      <button onclick="onClaimDailyClick()"
+      <button id="btnClaim"
               style="padding:10px 16px;border:none;border-radius:10px;background:#2196F3;color:#fff;cursor:pointer;">
         Claim Daily Bonus (+100 pts)
       </button>
@@ -58,7 +59,18 @@
     </section>
   </main>
 
-  <!-- Important: load JS after the buttons -->
-  <script src="/assets/app.js"></script>
+  <!-- IMPORTANT: cache-busting param; script binds listeners itself -->
+  <script src="/assets/app.js?v=5"></script>
+  <!-- Fallback notice if app.js failed to load -->
+  <script>
+    setTimeout(function(){
+      // The script sets window.__APP_JS_LOADED__ = true on load.
+      if (!window.__APP_JS_LOADED__) {
+        const s = document.getElementById('connStatus');
+        if (s) s.textContent = 'Script failed to load (assets/app.js). Check path/case/caching.';
+        console.warn('app.js did not load or failed early.');
+      }
+    }, 200);
+  </script>
 </body>
 </html>
