@@ -3,74 +3,293 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>DreamPlay Personal Natural Resources (PNR) Digital Miner</title>
-  <meta name="description" content="DreamPlay PNR Digital Miner — earn OOM points daily on Polygon." />
-  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="/favicon-180.png">
-  <link rel="icon" type="image/png" sizes="512x512" href="/favicon-512.png">
-  <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif; margin: 0; padding: 0 16px 48px; }
-    header { display:flex; gap:12px; align-items:center; padding:16px 0; border-bottom: 1px solid rgba(0,0,0,.08); }
-    header img { height:56px; width:auto; border-radius:8px; }
-    main { max-width: 920px; margin: 0 auto; }
-    h1 { margin: 0; font-size: 1.25rem; }
-    .sub { opacity:.8; font-size:.95rem; margin-top:4px; }
-    section { margin-top: 20px; }
-    button { font-weight: 600; }
-    .badge { padding:2px 8px; border-radius:999px; font-size:.8rem; background:#eef; color:#223; }
-  </style>
+  <title>DreamPlay Personal Natural Resource (PNR) Miner</title>
+  <link rel="stylesheet" href="/assets/styles.css" />
+  <!-- ethers v6 UMD is fine to keep; we don't require it in this page JS -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js" defer></script>
 </head>
 <body>
-  <main>
-    <header>
-      <img src="/assets/dreamplay-logo.png" alt="DreamPlay logo">
-      <div>
-        <h1>DreamPlay Personal Natural Resources (PNR) Digital Miner</h1>
-        <div class="sub">Your sponsor must be an Anchor or someone who has launched via the DreamPlay Token Factory.</div>
+  <div class="container">
+    <div class="row" style="justify-content:space-between">
+      <h1>PNR Miner</h1>
+      <a class="badge-link" href="/dgnn/">Go to DGNN →</a>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <button id="connectMetaMask">Connect with MetaMask</button>
+        <span id="connectStatus" class="small"></span>
       </div>
-    </header>
+    </div>
 
-    <!-- Wallet -->
-    <section id="wallet" style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
-      <button id="connectBtn"
-              style="padding:10px 16px;border:none;border-radius:10px;background:#6b46c1;color:#fff;cursor:pointer;">
-        Connect with MetaMask
-      </button>
-      <span id="connStatus" style="opacity:.8">Not connected</span>
-      <span id="jsStatus" class="badge" style="display:none;">JS loaded</span>
-    </section>
+    <div class="card">
+      <h2>Actions</h2>
+      <div class="row">
+        <select id="actionSelect" class="input">
+          <option value="RECRUIT_MEMBER">Recruit a New Member (+20 pts)</option>
+          <option value="COACH_MEMBER">Coach a New Member (+15 pts)</option>
+          <option value="CREATE_CONTENT">Create Content (+10 pts)</option>
+          <option value="SHARE_CONTENT">Share Content (+5 pts)</option>
+          <option value="VERIFY_ID">Verify ID (+15 pts)</option>
+          <option value="QUALITY_CONTROL">Quality Control (+5 pts)</option>
+          <option value="FINLIT_LESSON">Financial Literacy Lesson (+15 pts)</option>
+          <option value="REPORTER">Reporter (+15 pts)</option>
+          <option value="DREAMCASTER">DreamCaster (+15 pts)</option>
+          <option value="VOTE">Vote (+10 pts)</option>
+          <option value="BELIEF_CHAIN">Join the Belief Chain (+20 pts)</option>
+        </select>
+        <input id="sponsorInput" class="input" placeholder="Optional: sponsor / referral code" />
+        <button id="logBtn">Log Action</button>
+      </div>
+      <div id="actorStatus" class="small"></div>
 
-    <!-- Actions -->
-    <section id="actions" style="display:flex;gap:.75rem;flex-wrap:wrap">
-      <button id="btnRecruit"
-              style="padding:10px 16px;border:none;border-radius:10px;background:#4CAF50;color:#fff;cursor:pointer;">
-        Recruit a New Member (+20 pts)
-      </button>
+      <div class="small" style="margin-top:8px">Action catalog</div>
+      <table class="table">
+        <thead><tr><th>Action</th><th>Points</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td>Recruit a New Member</td><td>20</td><td class="small">Expands the DreamPlay community; new participants create network value.</td></tr>
+          <tr><td>Coach a New Member</td><td>15</td><td class="small">Provides mentorship, ensuring new entrants integrate effectively.</td></tr>
+          <tr><td>Create Content</td><td>10</td><td class="small">Generates intellectual and cultural assets for the ecosystem.</td></tr>
+          <tr><td>Share Content</td><td>5</td><td class="small">Distributes knowledge and amplifies visibility.</td></tr>
+          <tr><td>Verify ID</td><td>15</td><td class="small">Strengthens trust and compliance within the network.</td></tr>
+          <tr><td>Quality Control</td><td>5</td><td class="small">Supports integrity and consistency in project delivery.</td></tr>
+          <tr><td>Financial Literacy Lesson</td><td>15</td><td class="small">Expands community wealth intelligence and collective economic IQ.</td></tr>
+          <tr><td>Reporter</td><td>15</td><td class="small">Documents and narrates community progress, preserving history.</td></tr>
+          <tr><td>DreamCaster</td><td>15</td><td class="small">Hosts or broadcasts live experiences, growing the DreamPlay media loop.</td></tr>
+          <tr><td>Vote</td><td>10</td><td class="small">Participates in governance, ensuring distributed decision-making.</td></tr>
+          <tr><td>Join the Belief Chain</td><td>20</td><td class="small">Commits to shared mission and value alignment within the Dream Network.</td></tr>
+        </tbody>
+      </table>
+    </div>
 
-      <button id="btnClaim"
-              style="padding:10px 16px;border:none;border-radius:10px;background:#2196F3;color:#fff;cursor:pointer;">
-        Claim Daily Bonus (+100 pts)
-      </button>
-    </section>
+    <div class="card">
+      <h2>Daily Video</h2>
+      <div class="row">
+        <iframe id="video" width="560" height="315"
+          src="https://www.youtube.com/embed/olQrCfkvbGw?rel=0&enablejsapi=1&playsinline=1"
+          title="YouTube video player" frameborder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerpolicy="strict-origin-when-cross-origin" allowfullscreen>
+        </iframe>
+      </div>
+      <div class="row">
+        <button id="claimBtn" disabled>Claim Daily Points</button>
+        <span id="claimStatus" class="small"><br><span id="claimDebug" class="small"></span>Watch at least 60s or 50% to enable claim.</span>
+      </div>
+    </div>
 
-    <!-- Readout -->
-    <section id="readouts" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-      <div id="lastResult" style="opacity:.9"></div>
-    </section>
-  </main>
+    <div class="card">
+      <h2>Verifier</h2>
+      <div class="row">
+        <button id="checkFunctions">Check Functions</button>
+        <button id="getNonce">Get Nonce</button>
+        <span id="verifyStatus" class="small"></span>
+      </div>
+    </div>
 
-  <!-- IMPORTANT: cache-busting param; script binds listeners itself -->
-  <script src="/assets/app.js?v=5"></script>
-  <!-- Fallback notice if app.js failed to load -->
-  <script>
-    setTimeout(function(){
-      // The script sets window.__APP_JS_LOADED__ = true on load.
-      if (!window.__APP_JS_LOADED__) {
-        const s = document.getElementById('connStatus');
-        if (s) s.textContent = 'Script failed to load (assets/app.js). Check path/case/caching.';
-        console.warn('app.js did not load or failed early.');
+    <div class="card">
+      <h2>Leaderboard</h2>
+      <div class="row">
+        <button id="refreshLbBtn">Refresh</button>
+        <span id="lbStatus" class="small"></span> &nbsp; <span id="lbUpdated" class="small"></span>
+      </div>
+      <table class="table">
+        <thead><tr><th>#</th><th>Address</th><th>Points</th></tr></thead>
+        <tbody id="lbTableBody"><tr><td>1</td><td>0x1234…abcd</td><td>42</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- YouTube API -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+
+  <!-- Page wiring: imports App (ESM) and binds UI -->
+  <script type="module">
+    import { App } from '/assets/app.js';
+
+    const $ = (s) => document.querySelector(s);
+
+    // ---- MetaMask Connect ----
+    const statusEl = $('#connectStatus');
+    const connectBtn = $('#connectMetaMask');
+    if (connectBtn) connectBtn.addEventListener('click', () => App.connectMetaMask(statusEl));
+
+    // ---- Actions → server (global 100/day cap enforced in backend) ----
+    const POINTS = {
+      RECRUIT_MEMBER: 20, COACH_MEMBER: 15, CREATE_CONTENT: 10, SHARE_CONTENT: 5,
+      VERIFY_ID: 15, QUALITY_CONTROL: 5, FINLIT_LESSON: 15, REPORTER: 15,
+      DREAMCASTER: 15, VOTE: 10, BELIEF_CHAIN: 20
+    };
+    const logBtn = $('#logBtn');
+    if (logBtn) logBtn.addEventListener('click', async () => {
+      const addr = App.state.address || localStorage.getItem('walletAddress');
+      if (!addr) { alert('Connect wallet first'); return; }
+      const actionId = ($('#actionSelect')?.value) || 'RECRUIT_MEMBER';
+      const sponsor = ($('#sponsorInput')?.value.trim()) || '';
+      const points = POINTS[actionId] ?? 0;
+
+      const actorStatus = $('#actorStatus');
+      actorStatus && (actorStatus.textContent = 'Logging…');
+      try {
+        const res = await App.logAction(actionId, points, sponsor);
+        if (res.awarded > 0) {
+          actorStatus.textContent = `Logged ${actionId} (+${res.awarded}) • Total ${res.dayTotal}`;
+        } else if (res.capped) {
+          actorStatus.textContent = `Daily cap reached (100).`;
+        } else {
+          actorStatus.textContent = `No points awarded.`;
+        }
+        // confetti
+        try { window.confetti && window.confetti({ spread: 60, particleCount: 80, origin: { y: 0.7 } }); } catch(_){}
+        // refresh leaderboard
+        document.getElementById('refreshLbBtn')?.click();
+      } catch (e) {
+        actorStatus && (actorStatus.textContent = 'Log failed');
+        alert('Log failed: ' + (e?.message || e));
       }
-    }, 200);
+    });
+
+    // ---- Verifier buttons (unchanged) ----
+    const verifyStatus = $('#verifyStatus');
+    $('#checkFunctions')?.addEventListener('click', async () => {
+      verifyStatus && (verifyStatus.textContent = 'Calling blobs-selftest…');
+      try {
+        const res = await fetch('/.netlify/functions/blobs-selftest', { headers: { accept: 'application/json' } });
+        const text = await res.text();
+        verifyStatus.textContent = 'blobs-selftest: ' + text.slice(0, 140) + (text.length>140?'…':'');
+      } catch(e) {
+        verifyStatus.textContent = 'blobs-selftest failed: ' + (e?.message || e);
+      }
+    });
+    $('#getNonce')?.addEventListener('click', async () => {
+      verifyStatus && (verifyStatus.textContent = 'Requesting nonce…');
+      try {
+        const res = await fetch('/.netlify/functions/nonce', { headers: { accept: 'application/json' } });
+        const text = await res.text();
+        verifyStatus.textContent = 'nonce: ' + text.slice(0, 140) + (text.length>140?'…':'');
+      } catch(e) {
+        verifyStatus.textContent = 'nonce failed: ' + (e?.message || e);
+      }
+    });
+
+    // ---- Daily Video gating + claim (kept same UX, calls backend claim) ----
+    const claimBtn = $('#claimBtn');
+    const claimStatus = $('#claimStatus');
+    const claimDebug = $('#claimDebug');
+    function setDebug(msg){ if (claimDebug) claimDebug.textContent = msg; }
+    if (claimStatus && !claimStatus.textContent) {
+      claimStatus.textContent = 'Watch at least 60s or 50% to enable claim.';
+    }
+
+    // prevent duplicate listeners
+    if (claimBtn) {
+      const fresh = claimBtn.cloneNode(true);
+      claimBtn.replaceWith(fresh);
+    }
+    const claimBtnFresh = $('#claimBtn');
+
+    let player, duration = 0, watched = 0, playing = false, lastTick = 0;
+    let apiReady = false, fallbackStarted = false;
+
+    function enableIfEligible(){
+      let percent = 0;
+      try { percent = duration ? (player.getCurrentTime() / Math.max(duration, 1)) : 0; } catch(_) {}
+      const eligible = (watched >= 60) || (percent >= 0.5);
+      if (claimBtnFresh) claimBtnFresh.disabled = !eligible;
+      if (claimStatus) claimStatus.textContent = eligible
+        ? 'Eligible to claim ✅'
+        : `Watch at least 60s or 50% — watched ${Math.floor(watched)}s (${Math.floor(percent*100)}%)`;
+    }
+
+    function startFallbackIfNeeded(){
+      if (apiReady || fallbackStarted) return;
+      fallbackStarted = true;
+      setDebug('⚠️ YT API not ready — fallback timer started');
+      let t = 0;
+      const iv = setInterval(()=>{
+        t += 1; watched = Math.max(watched, t); enableIfEligible();
+        if (t >= 60 || apiReady) { clearInterval(iv); }
+      }, 1000);
+    }
+    window.addEventListener('click', ()=> setTimeout(startFallbackIfNeeded, 1500), { once: true });
+
+    window.onYouTubeIframeAPIReady = function(){
+      apiReady = true; setDebug('YouTube API ready');
+      try {
+        player = new YT.Player('video', {
+          events: {
+            onReady: (e)=>{ try { duration = e.target.getDuration() || 0; } catch(_){ duration = 0; } setDebug('YT Player ready; duration=' + duration); enableIfEligible(); },
+            onStateChange: (e)=>{
+              const state = e.data;
+              if (state === YT.PlayerState.PLAYING) { playing = true; lastTick = performance.now(); }
+              else { if (playing){ const now = performance.now(); watched += (now - lastTick)/1000; } playing = false; enableIfEligible(); }
+            }
+          }
+        });
+      } catch (e) { setDebug('YT Player init error: ' + (e?.message || e)); }
+    };
+
+    setInterval(()=>{
+      if(playing && player){
+        const now = performance.now();
+        const delta = (now - lastTick)/1000;
+        lastTick = now; watched += delta;
+        try { duration = player.getDuration() || duration; } catch(_){}
+        enableIfEligible();
+      }
+    }, 500);
+
+    if (claimBtnFresh) claimBtnFresh.addEventListener('click', async () => {
+      claimBtnFresh.disabled = true;
+      if (claimStatus) claimStatus.textContent = 'Claiming…';
+      try {
+        let percent = 0;
+        try { percent = duration ? Math.min(1, player.getCurrentTime()/Math.max(duration, 1)) : (watched ? Math.min(1, watched/60) : 0); } catch(_) {
+          percent = watched ? Math.min(1, watched/60) : 0;
+        }
+        const resp = await App.postClaim('daily-video', { watchedSeconds: Math.floor(watched), progress: percent });
+        if (resp.alreadyClaimed) {
+          const mins = Math.ceil((resp.nextEligibleMs || 0) / 60000);
+          claimStatus.textContent = `Already claimed — try again in ~${mins} min.`;
+        } else if (resp.capped) {
+          claimStatus.textContent = `Daily cap reached (100 pts).`;
+        } else {
+          claimStatus.textContent = `Claimed! +${resp.pointsAwarded} (today ${resp.dayTotal})`;
+          try { window.confetti && window.confetti({ spread: 70, particleCount: 120, origin: { y: 0.6 } }); } catch(_){}
+          document.getElementById('refreshLbBtn')?.click();
+        }
+      } catch (e) {
+        claimStatus.textContent = 'Claim failed';
+        alert('Claim failed: ' + (e?.message || e));
+      } finally {
+        enableIfEligible();
+      }
+    });
+
+    // ---- Leaderboard (kept same, calls your function) ----
+    async function refreshLeaderboard(){
+      const lbBody = document.getElementById('lbTableBody');
+      const lbUpdated = document.getElementById('lbUpdated');
+      try {
+        const res = await fetch('/.netlify/functions/leaderboard', { headers: { accept: 'application/json' } });
+        const data = await res.json().catch(()=>({}));
+        if (data && data.ok && Array.isArray(data.entries) && lbBody) {
+          lbBody.innerHTML = data.entries.map((row, idx) => {
+            const addr = row[0]; const pts = row[1];
+            const s = addr ? (addr.slice(0,6)+'…'+addr.slice(-4)) : '—';
+            return `<tr><td>${idx+1}</td><td>${s}</td><td>${pts}</td></tr>`;
+          }).join('') || '<tr><td>—</td><td>—</td><td>—</td></tr>';
+          if (lbUpdated) lbUpdated.textContent = 'Last updated ' + new Date().toLocaleTimeString();
+        }
+      } catch(e){
+        if (lbUpdated) lbUpdated.textContent = 'Leaderboard error';
+      }
+    }
+    refreshLeaderboard();
+    document.getElementById('refreshLbBtn')?.addEventListener('click', refreshLeaderboard);
   </script>
+
+  <!-- confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 </body>
 </html>
