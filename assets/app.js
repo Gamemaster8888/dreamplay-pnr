@@ -1,4 +1,4 @@
-// /assets/app.js  (ESM)
+// /assets/app.js (ESM)
 export const App = (() => {
   const CHAIN_ID_HEX = "0x89"; // Polygon (137)
   const POLYGON_PARAMS = {
@@ -10,13 +10,12 @@ export const App = (() => {
   };
 
   const state = { address: null };
-
   const short = (a) => (a ? a.slice(0,6) + "…" + a.slice(-4) : "");
 
   async function ensureEthereum() {
     if (!window.ethereum) throw new Error("MetaMask not detected");
     return window.ethereum;
-    }
+  }
   async function ensurePolygon(eth) {
     const current = await eth.request({ method: "eth_chainId" });
     if (current !== CHAIN_ID_HEX) {
@@ -47,7 +46,6 @@ export const App = (() => {
     return acct;
   }
 
-  // Use your server function that enforces the 24h lock and 100/day cap on the "claim daily"
   async function postClaim(actionId, meta = {}) {
     const wallet = state.address || localStorage.getItem("walletAddress");
     if (!/^0x[a-fA-F0-9]{40}$/.test(wallet || "")) {
@@ -60,10 +58,9 @@ export const App = (() => {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data?.error || JSON.stringify(data));
-    return data; // {alreadyClaimed, nextEligibleMs, capped, pointsAwarded, dayTotal, storage}
+    return data;
   }
 
-  // General action logger → your server function with global 100/day cap (updated in our earlier step)
   async function logAction(actionId, points, sponsor = "") {
     const wallet = state.address || localStorage.getItem("walletAddress");
     if (!/^0x[a-fA-F0-9]{40}$/.test(wallet || "")) {
@@ -79,9 +76,22 @@ export const App = (() => {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data?.error || JSON.stringify(data));
-    // returns { ok:true, storage:"blobs", awarded, capped, dayTotal, ... }
-    return data;
+    return data; // {awarded, capped, dayTotal, storage...}
   }
 
-  return { state, short, connectMetaMask, postClaim, logAction };
+  // For the “Points today” badge
+  async function getTodayTotal() {
+    const wallet = state.address || localStorage.getItem("walletAddress");
+    if (!/^0x[a-fA-F0-9]{40}$/.test(wallet || "")) return null;
+    // Reuse claim endpoint to fetch state by issuing a dry-run GET with wallet, but without claiming.
+    // We’ll add a new lightweight endpoint later; for now, call claim and ignore if alreadyClaimed.
+    const url = `/.netlify/functions/claim-daily?wallet=${wallet}`;
+    const res = await fetch(url, { method: "GET", headers: { accept: "application/json" } });
+    const data = await res.json().catch(()=>({}));
+    // If GET returns alreadyClaimed/capped/pointsAwarded/dayTotal structure
+    if (typeof data?.dayTotal === "number") return data.dayTotal;
+    return null;
+  }
+
+  return { state, short, connectMetaMask, postClaim, logAction, getTodayTotal };
 })();
