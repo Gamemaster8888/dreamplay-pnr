@@ -76,7 +76,7 @@
       <h2>Belief Chain & Sponsor</h2>
       <div class="soft small" style="margin-bottom:.75rem">
         To earn OOM points with the PNR Digital Miner, you must accept the DreamPlay Core Values
-        (Certificate of Belief) and choose a sponsor (Anchor or launched member).
+        (Certificate of Belief) and choose a sponsor (Anchor or launched member). This is stored in your local profile for gating.
       </div>
       <div class="small muted" style="margin-bottom:.25rem">Polygon • Chain 137</div>
 
@@ -448,9 +448,29 @@
       }
     });
 
+    // --- Require vetted (COB + sponsor) before earning ---
+    function ensureVetted(forWhat) {
+      let ok = true;
+      const cobStatus = $("#cobStatus");
+      const bcStatus = $("#bcSponsorStatus");
+      if (!state.cobAccepted) {
+        if (cobStatus) { cobStatus.textContent = "Status: please accept COB before " + (forWhat || "earning points"); cobStatus.className="small bad"; }
+        alert("You must accept the Core Values (COB) before " + (forWhat || "earning points") + ".");
+        ok = false;
+      }
+      if (!state.lockedSponsor) {
+        if (bcStatus) { bcStatus.textContent = "Set and lock your sponsor before " + (forWhat || "earning points"); bcStatus.className="small bad"; }
+        alert("You must set a valid sponsor (Anchor or launched member) before " + (forWhat || "earning points") + ".");
+        ok = false;
+      }
+      return ok;
+    }
+
     // --- Log action ---
     $("#logBtn")?.addEventListener("click", async ()=>{
       if (!isAddr(state.wallet)) { alert("Connect wallet first"); return; }
+      if (!ensureVetted("logging actions")) return;
+
       const id = $("#actionSelect")?.value || "RECRUIT_MEMBER";
 
       const sponsorField = $("#sponsorInput");
@@ -570,6 +590,8 @@
       const btn = document.getElementById("claimBtn");
 
       try {
+        if (!isAddr(state.wallet)) { alert("Connect wallet first"); return; }
+        if (!ensureVetted("claiming daily points")) return;
         if (!window.ethereum) return alert("Connect wallet first");
         const accounts = await window.ethereum.request({ method:"eth_accounts" });
         const wallet = (accounts && accounts[0]) || "";
