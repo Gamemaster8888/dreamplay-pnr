@@ -9,40 +9,15 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/favicon-180.png">
   <link rel="icon" type="image/png" sizes="512x512" href="/favicon-512.png">
   <style>
-    :root {
-      --card-bg:#fff;
-      --card-border:#e5e7eb;
-      --text:#111827;
-      --muted:#6b7280;
-      --link:#6b46c1;
-      --accent:#6b46c1;
-    }
+    :root { --card-bg:#fff; --card-border:#e5e7eb; --text:#111827; --muted:#6b7280; --link:#6b46c1; }
     * { box-sizing: border-box; }
-    body {
-      margin:0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
-      color:var(--text);
-      background:#f8fafc;
-    }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif; color:var(--text); background:#f8fafc; }
     .container { max-width: 980px; margin: 0 auto; padding: 20px; }
     .row { display:flex; gap:.75rem; align-items:center; flex-wrap:wrap; }
-    .card {
-      background:var(--card-bg);
-      border:1px solid var(--card-border);
-      border-radius:12px;
-      padding:16px;
-      margin-top:16px;
-      box-shadow:0 2px 8px rgba(0,0,0,.04);
-    }
+    .card { background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:16px; margin-top:16px; box-shadow:0 2px 8px rgba(0,0,0,.04); }
     h1 { margin:0; font-size:1.3rem; }
     h2 { margin:.25rem 0 .75rem; font-size:1.1rem; }
-    button {
-      padding:10px 16px;
-      border:none;
-      border-radius:10px;
-      font-weight:600;
-      cursor:pointer;
-    }
+    button { padding:10px 16px; border:none; border-radius:10px; font-weight:600; cursor:pointer; }
     .btn-primary { background:#6b46c1; color:#fff; }
     .btn-green { background:#22c55e; color:#fff; }
     .btn-blue { background:#3b82f6; color:#fff; }
@@ -50,62 +25,20 @@
     .small { font-size:.92rem; opacity:.95; }
     .muted { color:var(--muted); }
     a { color:var(--link); text-decoration:none; }
-    a.badge-link {
-      border:1px solid #d6bcfa;
-      background:#f5f3ff;
-      padding:6px 10px;
-      border-radius:999px;
-      font-weight:600;
-    }
-    .badge {
-      display:inline-block;
-      padding:3px 8px;
-      border:1px solid #dbeafe;
-      background:#eff6ff;
-      border-radius:999px;
-    }
-    input, select, textarea {
-      padding:10px;
-      border:1px solid #cbd5e1;
-      border-radius:10px;
-      font-size:.95rem;
-      color:var(--text);
-      background:#ffffff;
-    }
-    input::placeholder, textarea::placeholder {
-      color:#9ca3af;
-    }
-    textarea { width:100%; min-height:80px; resize:vertical; }
+    a.badge-link { border:1px solid #d6bcfa; background:#f5f3ff; padding:6px 10px; border-radius:999px; font-weight:600; }
+    .badge { display:inline-block; padding:3px 8px; border:1px solid #dbeafe; background:#eff6ff; border-radius:999px; }
+    input, select { padding:10px; border:1px solid #cbd5e1; border-radius:10px; }
     .grow { flex:1 1 auto; min-width:240px; }
     table { width:100%; border-collapse: collapse; }
     thead th { text-align:left; border-bottom:1px solid var(--card-border); padding:6px 4px; }
     tbody td { border-bottom:1px solid #f1f5f9; padding:8px 4px; }
     .ok { color:#16a34a; }
     .bad { color:#dc2626; }
-    .videoWrap { position:relative; display:inline-block; max-width:100%; }
-    .videoWrap iframe { max-width:100%; border-radius:10px; }
+    .videoWrap { position:relative; display:inline-block; }
     .videoCover { position:absolute; inset:0; cursor:pointer; }
-    .copy-btn {
-      padding:6px 10px;
-      border-radius:8px;
-      background:#eef2ff;
-      border:1px solid #c7d2fe;
-      font-weight:600;
-      cursor:pointer;
-    }
-    .pill {
-      display:inline-block;
-      padding:3px 10px;
-      border-radius:999px;
-      background:#ecfeff;
-      border:1px solid #67e8f9;
-      font-size:.8rem;
-    }
+    .copy-btn { padding:6px 10px; border-radius:8px; background:#eef2ff; border:1px solid #c7d2fe; font-weight:600; cursor:pointer; }
   </style>
-
-  <!-- Ethers v5 for on-chain SponsorRegistry -->
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
-  <!-- YouTube API + confetti -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 </head>
@@ -122,65 +55,26 @@
       <a class="badge-link" href="/dgnn/">Go to DGNN →</a>
     </header>
 
-    <!-- Wallet connect -->
+    <!-- Wallet -->
     <section class="card">
-      <div class="row" style="justify-content:space-between; align-items:center;">
-        <div class="row">
-          <button id="connectBtn" class="btn-primary">Connect with MetaMask</button>
-          <span id="connStatus" class="small">Not connected • Polygon (137) required</span>
-          <span class="badge">JS loaded</span>
-        </div>
-        <div id="pointsToday" class="small muted"></div>
+      <div class="row">
+        <button id="connectBtn" class="btn-primary">Connect with MetaMask</button>
+        <!-- Mobile deep link into MetaMask app -->
+        <a id="openInMM"
+           href="https://metamask.app.link/dapp/dreamplay-pnr.netlify.app/"
+           style="display:none;padding:10px 16px;border-radius:10px;border:1px solid #cbd5e1;background:#fff;text-decoration:none;font-weight:600;">
+          Open in MetaMask (mobile)
+        </a>
+        <span id="connStatus" class="small">Not connected</span>
+        <span class="badge">JS loaded</span>
       </div>
+      <div id="pointsToday" class="small muted"></div>
     </section>
 
-    <!-- Belief Chain / Sponsor Registry -->
+    <!-- Actions -->
     <section class="card">
-      <h2>Belief Chain &amp; Sponsor</h2>
-      <div class="small muted" style="margin-bottom:.5rem;">
-        To earn OOM points with the PNR Digital Miner, you must accept the DreamPlay Core Values (Certificate of Belief) and choose a sponsor (Anchor or launched member). This is stored once in the on-chain Sponsor Registry.
-      </div>
-
-      <div class="small muted" style="margin-bottom:.5rem;">
-        <span class="pill">Polygon • Chain 137</span>
-      </div>
-
-      <div style="margin-bottom:.5rem;">
-        <div class="small" style="font-weight:600; margin-bottom:.25rem;">Certificate of Belief (COB)</div>
-        <div id="cobText" class="small muted" style="max-height:140px; overflow:auto; padding:8px; background:#f9fafb; border-radius:8px;">
-          Loading COB text from registry…
-        </div>
-      </div>
-
-      <div class="row" style="gap:.5rem; margin-top:.25rem;">
-        <button id="acceptCobBtn" class="btn-blue">Accept Core Values (COB)</button>
-        <span id="cobStatus" class="small muted">Status: unknown</span>
-      </div>
-
-      <div style="margin-top:.75rem;">
-        <div class="small" style="font-weight:600; margin-bottom:.25rem;">My Sponsor (Anchor or Launched Member)</div>
-        <div class="row" style="gap:.5rem;">
-          <input id="sponsorSetInput" class="grow" placeholder="0x… Anchor or launched member address">
-          <button id="setSponsorBtn" class="soft">Set Sponsor</button>
-        </div>
-        <div class="small" id="sponsorOnChain" style="margin-top:.25rem;">Sponsor: (not set)</div>
-      </div>
-
-      <div style="margin-top:.75rem;">
-        <div id="beliefStatus" class="small muted">
-          Belief Chain status: unknown.
-        </div>
-      </div>
-    </section>
-
-    <!-- PNR action logger -->
-    <section class="card">
-      <h2>PNR Digital Miner</h2>
-      <div class="small muted" style="margin-bottom:.5rem;">
-        Log real actions that grow people, stories, and liquidity. Points are managed via the DreamPlay backend, but your sponsor relationship is enforced on-chain via the Sponsor Registry.
-      </div>
-
-      <div class="row" style="gap:.5rem; margin-bottom:.5rem;">
+      <h2>Actions</h2>
+      <div class="row" style="gap:.5rem">
         <select id="actionSelect">
           <option value="RECRUIT_MEMBER">Recruit a New Member (+20 pts)</option>
           <option value="COACH_MEMBER">Coach a New Member (+15 pts)</option>
@@ -194,56 +88,40 @@
           <option value="VOTE">Vote (+10 pts)</option>
           <option value="BELIEF_CHAIN">Join the Belief Chain (+20 pts)</option>
         </select>
+        <input id="sponsorInput" class="grow" placeholder="Sponsor (required)">
+        <button id="checkSponsorBtn" class="soft">Check sponsor</button>
+        <span id="sponsorStatus" class="small muted"></span>
       </div>
-
-      <div style="margin-bottom:.5rem;">
-        <textarea id="notesInput" placeholder="Notes (optional) — add any context so your leader or verifier can understand this action…"></textarea>
-      </div>
-
-      <div class="row" style="gap:.5rem; margin-top:.25rem;">
-        <button id="logBtn" class="btn-green">Log Action &amp; Earn OOM</button>
+      <div class="row" style="gap:.5rem; margin-top:.5rem">
+        <button id="logBtn" class="btn-green">Log Action</button>
         <div id="actorStatus" class="small"></div>
-      </div>
-
-      <div class="small muted" style="margin-top:.75rem;">
-        <b>Points &amp; Limits</b><br/>
-        Each action type has a fixed OOM point value. Daily cap is 100 points per wallet across all actions. The backend enforces caps and validation.
       </div>
     </section>
 
-    <!-- Daily video + claim -->
+    <!-- Daily Video -->
     <section class="card">
-      <h2>Daily Watch Action</h2>
-      <div class="small muted" style="margin-bottom:.5rem;">
-        After you’ve watched the daily video, click the button below to claim your daily “watch route” points. This uses the same backend as your other PNR actions.
-      </div>
-
+      <h2>Daily Video</h2>
       <div class="row">
         <div class="videoWrap">
           <iframe id="video" width="560" height="315"
             src="https://www.youtube.com/embed/olQrCfkvbGw?rel=0&enablejsapi=1&playsinline=1"
-            title="Daily DreamPlay Video" frameborder="0"
+            title="YouTube video player" frameborder="0"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
           <div id="videoCover" class="videoCover" title="Click to start watching"></div>
         </div>
       </div>
-
-      <div class="row" style="margin-top:.5rem;">
-        <button id="claimBtn" class="btn-blue" disabled>I Watched Today (Claim Daily)</button>
-        <span id="claimStatus" class="small">
-          Watch at least <b>60s and 50%</b> to enable claim.
-        </span>
-      </div>
-      <div class="row" style="margin-top:.25rem;">
-        <span id="dailyReset" class="small muted"></span>
+      <div class="row" style="margin-top:.5rem">
+        <button id="claimBtn" class="btn-blue" disabled>Claim Daily Points (+15)</button>
+        <button id="checkClaimBtn" class="soft">Check Claim Status</button>
+        <span id="claimStatus" class="small">Watch at least <b>60s and 50%</b> to enable claim.</span>
         <span id="claimDebug" class="small muted"></span>
       </div>
     </section>
 
-    <!-- Verifier tools -->
+    <!-- Verifier -->
     <section class="card">
-      <h2>Verifier Tools</h2>
+      <h2>Verifier</h2>
       <div class="row">
         <button id="checkFunctions">Check Functions</button>
         <button id="getNonce">Get Nonce</button>
@@ -287,21 +165,12 @@
         <tbody id="ppbWallets"><tr><td>—</td><td>—</td><td>—</td><td></td></tr></tbody>
       </table>
     </section>
-
-    <section class="card">
-      <h2>Need Help?</h2>
-      <div class="small muted">
-        1. Connect wallet on Polygon (137).<br/>
-        2. Accept the Core Values (COB).<br/>
-        3. Set your sponsor once (Anchor or launched member).<br/>
-        4. Log real actions in the PNR Miner and keep the rhythm.
-      </div>
-    </section>
   </div>
 
   <script>
   (function(){
-    const CHAIN_ID_HEX = "0x89";
+    const CHAIN_ID_HEX = "0x89"; // Polygon
+    const ZERO = "0x0000000000000000000000000000000000000000";
     const POLYGON_PARAMS = {
       chainId: CHAIN_ID_HEX,
       chainName: "Polygon Mainnet",
@@ -309,18 +178,6 @@
       rpcUrls: [window.POLYGON_PUBLIC_RPC || "https://rpc.ankr.com/polygon"],
       blockExplorerUrls: ["https://polygonscan.com"]
     };
-
-    const SPONSOR_REG_ADDR = "0xAf31D65A5B582258655F246F3098aE003e784AC1";
-
-    const SPONSOR_REG_ABI = [
-      "function cobText() view returns (string)",
-      "function hasAcceptedCOB(address) view returns (bool)",
-      "function acceptCOB() external",
-      "function sponsorOf(address) view returns (address)",
-      "function setSponsor(address sponsor) external",
-      "function isBeliefChainMember(address) view returns (bool)",
-      "function isValidSponsor(address) view returns (bool)"
-    ];
 
     const $ = (s)=>document.querySelector(s);
     const short = (a)=> a ? a.slice(0,6)+"…"+a.slice(-4) : "";
@@ -330,33 +187,43 @@
     function setPointsToday(t){ const el=$("#pointsToday"); if(el) el.textContent=t; }
 
     async function getJSON(url){
-      const r = await fetch(url,{headers:{accept:"application/json"}});
-      const d = await r.json().catch(()=>({}));
+      const r=await fetch(url,{headers:{accept:"application/json"}});
+      const d=await r.json().catch(()=>({}));
       if(!r.ok) throw new Error(d?.error||JSON.stringify(d));
       return d;
     }
     async function postJSON(url,body){
-      const r = await fetch(url,{
+      const r=await fetch(url,{
         method:"POST",
         headers:{"content-type":"application/json",accept:"application/json"},
         body:JSON.stringify(body)
       });
-      const d = await r.json().catch(()=>({}));
+      const d=await r.json().catch(()=>({}));
       if(!r.ok) throw new Error(d?.error||JSON.stringify(d));
       return d;
     }
 
-    const state = {
-      wallet:"",
-      provider:null,
-      signer:null,
-      reg:null
-    };
+    // --- Mobile + MetaMask detection ---
+    function isMobile() {
+      return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+    }
+    function showOpenInMMIfNeeded() {
+      const link = document.getElementById("openInMM");
+      if (!link) return;
+      if (isMobile() && typeof window.ethereum === "undefined") {
+        link.style.display = "inline-block";
+      } else {
+        link.style.display = "none";
+      }
+    }
+    document.addEventListener("DOMContentLoaded", showOpenInMMIfNeeded);
+
+    const state = { wallet:"" };
 
     async function ensureEthereum(){
       if(!window.ethereum){
-        alert("MetaMask required");
-        throw new Error("no metamask");
+        alert("On mobile, open this page inside the MetaMask app.\nTap the 'Open in MetaMask (mobile)' button.");
+        throw new Error("No ethereum provider");
       }
       return window.ethereum;
     }
@@ -367,7 +234,7 @@
         try {
           await eth.request({ method:"wallet_switchEthereumChain", params:[{chainId:CHAIN_ID_HEX}] });
         } catch(e){
-          if(e && e.code === 4902){
+          if(e && e.code===4902){
             await eth.request({ method:"wallet_addEthereumChain", params:[POLYGON_PARAMS] });
           } else {
             throw e;
@@ -376,229 +243,129 @@
       }
     }
 
+    async function getTodayTotal(){
+      if (!isAddr(state.wallet)) return null;
+      const d = await getJSON(`/.netlify/functions/claim-daily?wallet=${state.wallet}&mode=status`);
+      return (typeof d?.dayTotal==="number") ? d.dayTotal : null;
+    }
+
     async function connect(){
       const eth = await ensureEthereum();
       await ensurePolygon(eth);
-      const provider = new ethers.providers.Web3Provider(eth);
-      const signer = provider.getSigner();
-      const wallet = await signer.getAddress();
-
-      state.wallet = wallet;
-      state.provider = provider;
-      state.signer = signer;
-      state.reg = new ethers.Contract(SPONSOR_REG_ADDR, SPONSOR_REG_ABI, signer);
-
-      setStatus(`Connected: ${short(wallet)} • chain 137`);
-      await refreshBeliefChain();
+      const accts = await eth.request({ method:"eth_requestAccounts" });
+      if(!accts || !accts[0]) throw new Error("No account");
+      state.wallet = accts[0];
+      setStatus(`Connected: ${short(state.wallet)} • chain 137`);
       const tot = await getTodayTotal();
-      if (typeof tot === "number") setPointsToday(`Points today: ${tot} / 100`);
+      if (typeof tot==="number") setPointsToday(`Points today: ${tot} / 100`);
     }
+    $("#connectBtn")?.addEventListener("click", async () => {
+      try { await connect(); } catch(e){ console.warn(e); }
+    });
 
-    async function getTodayTotal(){
-      if (!isAddr(state.wallet)) return null;
-      try {
-        const d = await getJSON(`/.netlify/functions/claim-daily?wallet=${state.wallet}&mode=status`);
-        return (typeof d?.dayTotal==="number") ? d.dayTotal : null;
-      } catch {
-        return null;
-      }
-    }
-
-    async function refreshBeliefChain(){
-      if (!state.signer || !state.reg || !isAddr(state.wallet)) return;
-      try {
-        const cob = await state.reg.cobText();
-        const elCob = $("#cobText");
-        if (elCob) elCob.textContent = cob || "Certificate of Belief text not set.";
-
-        const hasCob = await state.reg.hasAcceptedCOB(state.wallet);
-        const sponsor = await state.reg.sponsorOf(state.wallet);
-        const member = await state.reg.isBeliefChainMember(state.wallet);
-
-        const cobStatus = $("#cobStatus");
-        const sponsorOnChain = $("#sponsorOnChain");
-        const beliefStatus = $("#beliefStatus");
-        const sponsorInput = $("#sponsorSetInput");
-
-        if (cobStatus){
-          cobStatus.textContent = hasCob ? "Status: COB accepted ✅" : "Status: COB not accepted";
-        }
-        if (sponsorOnChain){
-          sponsorOnChain.textContent = sponsor && sponsor !== ethers.constants.AddressZero
-            ? `Sponsor: ${sponsor}`
-            : "Sponsor: (not set)";
-        }
-        if (beliefStatus){
-          beliefStatus.textContent = member
-            ? "Belief Chain Member • COB accepted + sponsor set"
-            : "Not yet a Belief Chain member. Accept COB and set a valid sponsor.";
-        }
-        if (sponsorInput && sponsor && sponsor !== ethers.constants.AddressZero){
-          sponsorInput.value = sponsor;
-        }
-      } catch (e){
-        console.error("refreshBeliefChain error", e);
-      }
-    }
-
-    $("#connectBtn")?.addEventListener("click", connect);
-
-    // Auto-connect if already authorized
+    // Auto-detect existing account (desktop / MM browser)
     (async ()=>{
       try{
         if (window.ethereum){
           const accts = await window.ethereum.request({ method:"eth_accounts" });
           const acct = Array.isArray(accts) && accts[0] ? accts[0] : "";
           if (acct){
-            await connect();
+            state.wallet = acct;
+            setStatus(`Connected: ${short(acct)} • chain 137`);
+            const tot = await getTodayTotal();
+            if (typeof tot==="number") setPointsToday(`Points today: ${tot} / 100`);
           } else {
-            setStatus("Not connected • Polygon (137) required");
+            setStatus("Not connected");
           }
         }
-      } catch {
-        setStatus("Not connected • Polygon (137) required");
-      }
+      } catch {}
     })();
 
-    // Accept COB
-    $("#acceptCobBtn")?.addEventListener("click", async ()=>{
-      try{
-        if (!state.signer || !state.reg || !isAddr(state.wallet)){
-          await connect();
+    // React to account / chain changes
+    if (window.ethereum) {
+      window.ethereum.on?.("accountsChanged", (accs)=>{
+        const a = accs && accs[0];
+        if (a) {
+          state.wallet = a;
+          setStatus(`Connected: ${short(a)} • chain 137`);
+          getTodayTotal().then(t => {
+            if (typeof t==="number") setPointsToday(`Points today: ${t} / 100`);
+          }).catch(()=>{});
+        } else {
+          state.wallet = "";
+          setStatus("Not connected");
+          setPointsToday("");
         }
-        const btn = $("#acceptCobBtn");
-        const cobStatus = $("#cobStatus");
-        if (btn) { btn.disabled = true; }
-        if (cobStatus) cobStatus.textContent = "Status: accepting…";
+      });
+      window.ethereum.on?.("chainChanged", (_id)=>{
+        // Simple + safe: reload on chain change
+        location.reload();
+      });
+    }
 
-        const tx = await state.reg.acceptCOB();
-        await tx.wait();
+    // --- Sponsor validation ---
+    async function validateSponsorUI(addr){
+      if (!isAddr(addr)) return { ok:false, reason:"Invalid address" };
+      try {
+        const res = await getJSON(`/.netlify/functions/admin-sponsors?sponsor=${addr}`);
+        return res?.valid ? { ok:true } : { ok:false, reason: res?.reason || "Not an Anchor/Launcher" };
+      } catch(e){ return { ok:false, reason: e?.message || "Validation error" }; }
+    }
 
-        if (cobStatus) cobStatus.textContent = "Status: COB accepted ✅";
-        await refreshBeliefChain();
-      } catch(e){
-        alert(e?.reason || e?.message || e);
-      } finally {
-        const btn = $("#acceptCobBtn");
-        if (btn) btn.disabled = false;
-      }
+    $("#checkSponsorBtn")?.addEventListener("click", async ()=>{
+      const s = ($("#sponsorInput")?.value||"").trim();
+      const out = await validateSponsorUI(s);
+      const el = $("#sponsorStatus");
+      if (out.ok) { el.className="small ok"; el.textContent="Sponsor valid ✅"; }
+      else { el.className="small bad"; el.textContent=`Invalid sponsor: ${out.reason||""}`; }
     });
 
-    // Set Sponsor
-    $("#setSponsorBtn")?.addEventListener("click", async ()=>{
-      try{
-        if (!state.signer || !state.reg || !isAddr(state.wallet)){
-          await connect();
-        }
-        const sponsorRaw = ($("#sponsorSetInput")?.value || "").trim();
-        if (!isAddr(sponsorRaw)){
-          alert("Enter a valid sponsor address (0x…) that is an Anchor or launched member.");
-          return;
-        }
-
-        const cobOk = await state.reg.hasAcceptedCOB(state.wallet);
-        if (!cobOk){
-          alert("You must accept the Core Values (COB) before setting a sponsor.");
-          return;
-        }
-
-        // Optional pre-check
-        let valid = false;
-        try {
-          valid = await state.reg.isValidSponsor(sponsorRaw);
-        } catch { valid = false; }
-        if (!valid){
-          if (!confirm("On-chain validity check failed. Continue anyway and let the transaction revert if invalid?")){
-            return;
-          }
-        }
-
-        const btn = $("#setSponsorBtn");
-        const sponsorOnChain = $("#sponsorOnChain");
-        if (btn) btn.disabled = true;
-        if (sponsorOnChain) sponsorOnChain.textContent = "Sponsor: setting…";
-
-        const tx = await state.reg.setSponsor(sponsorRaw);
-        await tx.wait();
-
-        await refreshBeliefChain();
-      } catch(e){
-        alert(e?.reason || e?.message || e);
-      } finally {
-        const btn = $("#setSponsorBtn");
-        if (btn) btn.disabled = false;
-      }
-    });
-
-    // Action logger -> Netlify backend
+    // --- Log action ---
     $("#logBtn")?.addEventListener("click", async ()=>{
-      try{
-        if (!state.signer || !state.reg || !isAddr(state.wallet)){
-          await connect();
-        }
-        const member = await state.reg.isBeliefChainMember(state.wallet);
-        if (!member){
-          alert("You must be a Belief Chain member (COB + sponsor) before logging actions.");
-          return;
-        }
-        const sponsor = await state.reg.sponsorOf(state.wallet);
-        if (!isAddr(sponsor)){
-          alert("Sponsor not set or invalid on-chain. Please set your sponsor first.");
-          await refreshBeliefChain();
-          return;
-        }
+      if (!isAddr(state.wallet)) { alert("Connect wallet first"); return; }
+      const id = $("#actionSelect")?.value || "RECRUIT_MEMBER";
+      const sponsor = ($("#sponsorInput")?.value||"").trim();
+      const ptsMap = {
+        RECRUIT_MEMBER:20, COACH_MEMBER:15, CREATE_CONTENT:10, SHARE_CONTENT:5,
+        VERIFY_ID:15, QUALITY_CONTROL:5, FINLIT_LESSON:15, REPORTER:15,
+        DREAMCASTER:15, VOTE:10, BELIEF_CHAIN:20
+      };
+      const pts = ptsMap[id]||0;
 
-        const id = $("#actionSelect")?.value || "RECRUIT_MEMBER";
-        const notes = $("#notesInput")?.value || "";
-        const ptsMap = {
-          RECRUIT_MEMBER:20,
-          COACH_MEMBER:15,
-          CREATE_CONTENT:10,
-          SHARE_CONTENT:5,
-          VERIFY_ID:15,
-          QUALITY_CONTROL:5,
-          FINLIT_LESSON:15,
-          REPORTER:15,
-          DREAMCASTER:15,
-          VOTE:10,
-          BELIEF_CHAIN:20
-        };
-        const pts = ptsMap[id] || 0;
+      const sEl = $("#sponsorStatus");
+      const vOut = await validateSponsorUI(sponsor);
+      if (!vOut.ok){
+        if (sEl){ sEl.className="small bad"; sEl.textContent=`Invalid sponsor: ${vOut.reason||""}`; }
+        alert("Sponsor is required and must be an Anchor or Launcher.");
+        return;
+      } else {
+        if (sEl){ sEl.className="small ok"; sEl.textContent="Sponsor valid ✅"; }
+      }
 
-        const st = $("#actorStatus");
-        if (st) st.textContent = "Logging…";
-
+      const st=$("#actorStatus"); st.textContent="Logging…";
+      try {
         const out = await postJSON("/.netlify/functions/log-action", {
-          wallet: state.wallet,
-          action: id,
-          points: pts,
-          sponsor,
-          notes
+          wallet: state.wallet, action: id, points: pts, sponsor
         });
-
         const maxed = out.capped || (typeof out.dayTotal === "number" && out.dayTotal >= 100);
         if (out.awarded > 0){
-          if (st) st.textContent = `Logged ${id} (+${out.awarded}) • Total ${out.dayTotal}`;
-          try{
-            window.confetti && window.confetti({ spread:60, particleCount:80, origin:{y:0.7} });
-          }catch(_){}
+          st.textContent=`Logged ${id} (+${out.awarded}) • Total ${out.dayTotal}`;
+          try{ window.confetti && window.confetti({ spread:60, particleCount:80, origin:{y:0.7} }); }catch(_){}
         } else if (maxed){
-          if (st) st.textContent = "Max Daily Pts Reached (100).";
+          st.textContent="Max Daily Pts Reached (100).";
         } else {
-          if (st) st.textContent = "No points awarded.";
+          st.textContent="No points awarded.";
         }
-
         const tot = await getTodayTotal();
         if (typeof tot==="number") setPointsToday(`Points today: ${tot} / 100`);
         $("#refreshLbBtn")?.click();
       } catch(e){
-        const st = $("#actorStatus");
-        if (st) st.textContent = "Log failed";
-        alert(e?.message || e);
+        st.textContent="Log failed";
+        alert(e?.message||e);
       }
     });
 
-    // Daily video gating
+    // --- Daily video gate + claim ---
     let player, duration=0, watched=0, playing=false, apiReady=false, started=false;
     const cover = $("#videoCover");
     if (cover){
@@ -609,16 +376,11 @@
     }
 
     window.onYouTubeIframeAPIReady = function(){
-      const dbg=$("#claimDebug");
-      apiReady=true;
-      if(dbg) dbg.textContent="YouTube API ready";
+      const dbg=$("#claimDebug"); apiReady=true; if(dbg) dbg.textContent="YouTube API ready";
       try{
         player = new YT.Player('video',{
           events:{
-            onReady:(e)=>{
-              try{ duration=e.target.getDuration()||0; }catch(_){ duration=0; }
-              updateGate();
-            },
+            onReady:(e)=>{ try{ duration=e.target.getDuration()||0; }catch(_){ duration=0; } updateGate(); },
             onStateChange:(e)=>{
               if (e.data===YT.PlayerState.PLAYING){ playing=true; }
               else { if (playing){ playing=false; updateGate(); } }
@@ -630,40 +392,46 @@
       }
     };
 
-    setInterval(()=>{
-      if (started && playing){
-        watched += 0.5;
-        updateGate();
-      }
-    }, 500);
+    setInterval(()=>{ if (started && playing){ watched += 0.5; updateGate(); } }, 500);
 
     function eligibleNow(){
       if (!started) return false;
       if (apiReady && player){
         let pct=0;
-        try{
-          pct = duration ? (player.getCurrentTime()/Math.max(duration,1)) : 0;
-        }catch(_){}
+        try{ pct = duration ? (player.getCurrentTime()/Math.max(duration,1)) : 0; }catch(_){}
         return (watched >= 60) && (pct >= 0.5);
       }
       return watched >= 60;
     }
-
     function updateGate(){
       const btn=$("#claimBtn"), status=$("#claimStatus");
       if(!btn||!status) return;
       const ok = eligibleNow();
       btn.disabled = !ok;
-      let pct=0;
-      try{
-        pct = player ? (player.getCurrentTime()/Math.max(duration||1,1)) : 0;
-      }catch(_){}
+      let pct=0; try{ pct = player ? (player.getCurrentTime()/Math.max(duration||1,1)) : 0; }catch(_){}
       status.textContent = ok
         ? "Eligible to claim ✅"
         : `Watch at least 60s and 50% — watched ${Math.floor(watched)}s (${Math.floor(pct*100)}%)`;
     }
 
-    // Daily claim handler
+    // Check Claim Status button
+    document.getElementById("checkClaimBtn")?.addEventListener("click", async () => {
+      try{
+        if (!isAddr(state.wallet)) { alert("Connect wallet first"); return; }
+        const j = await getJSON(`/.netlify/functions/claim-daily?wallet=${state.wallet}&mode=status`);
+        const dbg = document.getElementById("claimDebug");
+        const status = document.getElementById("claimStatus");
+        if (dbg) dbg.textContent = "status: " + JSON.stringify(j);
+        if (j.alreadyClaimed) {
+          const mins = Math.ceil((j.nextEligibleMs || 0) / 60000);
+          status.textContent = `Already claimed — try again in ~${mins} min. (today ${j.dayTotal})`;
+        } else {
+          status.textContent = `Eligible? ${!j.alreadyClaimed} • Today ${j.dayTotal}`;
+        }
+      } catch(e){ alert(e?.message||e); }
+    });
+
+    // Claim button
     document.getElementById("claimBtn")?.addEventListener("click", async () => {
       const status = document.getElementById("claimStatus");
       const dbg = document.getElementById("claimDebug");
@@ -720,63 +488,42 @@
         status.textContent = "Claim failed";
         alert(e?.message || e);
       } finally {
-        btn.disabled = true;
+        btn.disabled = true; // require re-watch
       }
     });
 
-    // Countdown to next UTC midnight
-    function updateResetCountdown(){
-      const el = document.getElementById("dailyReset");
-      if (!el) return;
-      const now = new Date();
-      const nextUTC = new Date(Date.UTC(
-        now.getUTCFullYear(),
-        now.getUTCMonth(),
-        now.getUTCDate() + 1,
-        0,0,0
-      ));
-      const diff = nextUTC - now;
-      if (diff <= 0){
-        el.textContent = "Next UTC reset in 00:00:00";
-        return;
-      }
-      const sec = Math.floor(diff / 1000);
-      const h = String(Math.floor(sec / 3600)).padStart(2,"0");
-      const m = String(Math.floor((sec % 3600)/60)).padStart(2,"0");
-      const s = String(sec % 60).padStart(2,"0");
-      el.textContent = `Next UTC reset in ${h}:${m}:${s}`;
-    }
-    setInterval(updateResetCountdown, 1000);
-    updateResetCountdown();
-
-    // Verifier buttons
+    // --- Verifier buttons ---
     $("#checkFunctions")?.addEventListener("click", async ()=>{
-      const el=$("#verifyStatus");
-      el.textContent="Calling blobs-selftest…";
+      const el=$("#verifyStatus"); el.textContent="Calling blobs-selftest…";
       try{
         const r=await fetch("/.netlify/functions/blobs-selftest",{headers:{accept:"application/json"}});
         el.textContent="blobs-selftest: "+(await r.text()).slice(0,140);
+      } catch(e){
+        el.textContent="blobs-selftest failed: "+(e?.message||e);
       }
-      catch(e){ el.textContent="blobs-selftest failed: "+(e?.message||e); }
     });
     $("#getNonce")?.addEventListener("click", async ()=>{
-      const el=$("#verifyStatus");
-      el.textContent="Requesting nonce…";
+      const el=$("#verifyStatus"); el.textContent="Requesting nonce…";
       try{
         const r=await fetch("/.netlify/functions/nonce",{headers:{accept:"application/json"}});
         el.textContent="nonce: "+(await r.text()).slice(0,140);
+      } catch(e){
+        el.textContent="nonce failed: "+(e?.message||e);
       }
-      catch(e){ el.textContent="nonce failed: "+(e?.message||e); }
     });
 
-    // Leaderboard
+    // --- Leaderboard ---
     async function refreshLeaderboard(){
       const body=$("#lbTableBody"), lbStatus=$("#lbStatus"), lbUpdated=$("#lbUpdated");
       lbStatus.textContent="Loading…";
       try{
         const data = await getJSON("/.netlify/functions/leaderboard");
         if (data.ok && Array.isArray(data.entries)){
-          body.innerHTML = data.entries.map((row,i)=>`<tr><td>${i+1}</td><td title="${row[0]}">${row[0].slice(0,6)}…${row[0].slice(-4)}</td><td>${row[1]}</td></tr>`).join("") || `<tr><td>—</td><td>—</td><td>—</td></tr>`;
+          body.innerHTML = data.entries.map((row,i)=>`<tr>
+            <td>${i+1}</td>
+            <td title="${row[0]}">${row[0].slice(0,6)}…${row[0].slice(-4)}</td>
+            <td>${row[1]}</td>
+          </tr>`).join("") || `<tr><td>—</td><td>—</td><td>—</td></tr>`;
           lbUpdated.textContent="Updated "+new Date().toLocaleTimeString();
           lbStatus.textContent="";
         } else {
@@ -789,7 +536,7 @@
     $("#refreshLbBtn")?.addEventListener("click", refreshLeaderboard);
     refreshLeaderboard();
 
-    // Post Point Board
+    // --- Post Point Board ---
     async function buildPostPointBoard(){
       const status = document.getElementById("ppbStatus");
       const tbodyLv = document.getElementById("ppbLevels");
@@ -805,13 +552,18 @@
         if (!data?.ok) throw new Error(data?.error || "Post board failed");
 
         if (Array.isArray(data.levels) && data.levels.length){
-          tbodyLv.innerHTML = data.levels.map(l => `<tr><td>L${l.level}</td><td>${l.pct}%</td><td>${Number(l.points).toFixed(2)}</td></tr>`).join("");
+          tbodyLv.innerHTML = data.levels.map(l => `<tr>
+            <td>L${l.level}</td>
+            <td>${l.pct}%</td>
+            <td>${Number(l.points).toFixed(2)}</td>
+          </tr>`).join("");
         } else {
           tbodyLv.innerHTML = `<tr><td>—</td><td>—</td><td>—</td></tr>`;
         }
 
         if (Array.isArray(data.totals) && data.totals.length){
-          tbodyW.innerHTML = data.totals.map((row,i)=>{
+          const filtered = data.totals.filter(row => (row && row[0] && row[0].toLowerCase() !== ZERO));
+          tbodyW.innerHTML = filtered.map((row,i)=>{
             const addr = row[0];
             const pts  = Number(row[1]).toFixed(2);
             const label = addr.slice(0,6)+"…"+addr.slice(-4);
@@ -821,7 +573,7 @@
               <td>${pts}</td>
               <td><button class="copy-btn" data-copy="${addr}">Copy</button></td>
             </tr>`;
-          }).join("");
+          }).join("") || `<tr><td>—</td><td>—</td><td>—</td><td></td></tr>`;
         } else {
           tbodyW.innerHTML = `<tr><td>—</td><td>—</td><td>—</td><td></td></tr>`;
         }
