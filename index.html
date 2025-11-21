@@ -1,4 +1,4 @@
-<!doctype html>
+<!doctype html> 
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -69,6 +69,43 @@
         <span class="badge">JS loaded</span>
       </div>
       <div id="pointsToday" class="small muted"></div>
+    </section>
+
+    <!-- Belief Chain & Sponsor -->
+    <section class="card">
+      <h2>Belief Chain & Sponsor</h2>
+      <div class="soft small" style="margin-bottom:.75rem">
+        To earn OOM points with the PNR Digital Miner, you must accept the DreamPlay Core Values
+        (Certificate of Belief) and choose a sponsor (Anchor or launched member).
+      </div>
+      <div class="small muted" style="margin-bottom:.25rem">Polygon • Chain 137</div>
+
+      <div class="soft small" style="max-height:180px; overflow:auto; margin-bottom:.75rem">
+        <b>Certificate of Belief (COB)</b><br><br>
+        I accept and agree to the DreamPlay Core Value Statement and will uphold these values while participating
+        in DreamPlay activities:<br>
+        • I believe in my mission, I believe in your (other members) mission, We believe in the mission of DreamPlay.<br>
+        • I will always operate in LOVE and TRUTH with the other DreamPlay members.<br>
+        • I will always Trust the Process and Keep the Rhythm in DreamPlay.<br>
+        • I believe in my supporting members in this Certificate of Belief and in the power of our joint belief and actions.<br>
+        • I believe the collective belief and efforts of the DreamPlay community will raise the price of DreamPlay Liquidity Medallions (DPLIQX) to over $1000 before the end of the 2025 calendar year.<br>
+        • I accept the DreamPlay Core Values.
+      </div>
+
+      <div class="row" style="margin-bottom:.75rem">
+        <button id="acceptCobBtn" class="soft">Accept Core Values (COB)</button>
+        <span id="cobStatus" class="small muted">Status: not accepted</span>
+      </div>
+
+      <div>
+        <div class="small muted">My Sponsor (Anchor or Launched Member)</div>
+        <div class="row" style="gap:.5rem;margin-top:.25rem">
+          <input id="bcSponsorInput" class="grow" placeholder="0x…">
+          <button id="bcSetSponsorBtn" class="soft">Set Sponsor</button>
+          <span id="bcSponsorStatus" class="small muted"></span>
+        </div>
+        <div class="small muted" id="bcSummary" style="margin-top:.5rem"></div>
+      </div>
     </section>
 
     <!-- Actions -->
@@ -179,12 +216,21 @@
       blockExplorerUrls: ["https://polygonscan.com"]
     };
 
+    const PROFILE_KEY = "dp_pnr_profile_v1";
+
     const $ = (s)=>document.querySelector(s);
     const short = (a)=> a ? a.slice(0,6)+"…"+a.slice(-4) : "";
     const isAddr = (x)=> /^0x[a-fA-F0-9]{40}$/i.test(x||"");
 
     function setStatus(t){ const el=$("#connStatus"); if(el) el.textContent=t; }
     function setPointsToday(t){ const el=$("#pointsToday"); if(el) el.textContent=t; }
+
+    function loadProfile(){
+      try { return JSON.parse(localStorage.getItem(PROFILE_KEY) || "{}"); } catch { return {}; }
+    }
+    function saveProfile(p){
+      try { localStorage.setItem(PROFILE_KEY, JSON.stringify(p||{})); } catch {}
+    }
 
     async function getJSON(url){
       const r=await fetch(url,{headers:{accept:"application/json"}});
@@ -218,7 +264,7 @@
     }
     document.addEventListener("DOMContentLoaded", showOpenInMMIfNeeded);
 
-    const state = { wallet:"" };
+    const state = { wallet:"", lockedSponsor:null, cobAccepted:false };
 
     async function ensureEthereum(){
       if(!window.ethereum){
@@ -263,6 +309,47 @@
       try { await connect(); } catch(e){ console.warn(e); }
     });
 
+    // Load profile + URL sponsor lock
+    function applyProfile(){
+      const profile = loadProfile();
+      state.cobAccepted = !!profile.cobAccepted;
+      state.lockedSponsor = profile.sponsor && isAddr(profile.sponsor) ? profile.sponsor : null;
+
+      const params = new URLSearchParams(window.location.search || "");
+      const urlSponsor = params.get("s") || params.get("sponsor") || "";
+      if (isAddr(urlSponsor)) {
+        state.lockedSponsor = urlSponsor;
+        profile.sponsor = urlSponsor;
+        saveProfile(profile);
+      }
+
+      const cobStatus = $("#cobStatus");
+      if (state.cobAccepted) {
+        if (cobStatus) {
+          cobStatus.textContent = "Status: COB accepted ✅";
+          cobStatus.className = "small ok";
+        }
+      }
+
+      const bcSponsorInput = $("#bcSponsorInput");
+      const bcSponsorStatus = $("#bcSponsorStatus");
+      const bcSummary = $("#bcSummary");
+      const sponsorInput = $("#sponsorInput");
+
+      if (state.lockedSponsor && bcSponsorInput) {
+        bcSponsorInput.value = state.lockedSponsor;
+        bcSponsorInput.readOnly = true;
+        if (bcSponsorStatus) { bcSponsorStatus.textContent = "Sponsor locked"; bcSponsorStatus.className="small ok"; }
+        if (bcSummary) bcSummary.textContent = "Belief Chain Member • Sponsor set " + short(state.lockedSponsor);
+      }
+      if (state.lockedSponsor && sponsorInput) {
+        sponsorInput.value = state.lockedSponsor;
+        sponsorInput.readOnly = true;
+        sponsorInput.placeholder = "Locked from Belief Chain";
+      }
+    }
+    applyProfile();
+
     // Auto-detect existing account (desktop / MM browser)
     (async ()=>{
       try{
@@ -298,7 +385,6 @@
         }
       });
       window.ethereum.on?.("chainChanged", (_id)=>{
-        // Simple + safe: reload on chain change
         location.reload();
       });
     }
@@ -320,11 +406,57 @@
       else { el.className="small bad"; el.textContent=`Invalid sponsor: ${out.reason||""}`; }
     });
 
+    // --- COB accept ---
+    $("#acceptCobBtn")?.addEventListener("click", ()=>{
+      const profile = loadProfile();
+      profile.cobAccepted = true;
+      saveProfile(profile);
+      state.cobAccepted = true;
+      const cobStatus = $("#cobStatus");
+      if (cobStatus) { cobStatus.textContent="Status: COB accepted ✅"; cobStatus.className="small ok"; }
+    });
+
+    // --- Belief Chain: Set Sponsor ---
+    $("#bcSetSponsorBtn")?.addEventListener("click", async ()=>{
+      const bcInput = $("#bcSponsorInput");
+      const raw = (bcInput?.value || "").trim();
+      const bcStatus = $("#bcSponsorStatus");
+      const bcSummary = $("#bcSummary");
+      const sponsorInput = $("#sponsorInput");
+
+      const addr = raw;
+      const out = await validateSponsorUI(addr);
+      if (!out.ok) {
+        if (bcStatus) { bcStatus.textContent = `Invalid sponsor: ${out.reason||""}`; bcStatus.className="small bad"; }
+        alert("Sponsor is required and must be an Anchor or Launcher.");
+        return;
+      }
+
+      const profile = loadProfile();
+      profile.sponsor = addr;
+      saveProfile(profile);
+      state.lockedSponsor = addr;
+
+      if (bcInput) { bcInput.value = addr; bcInput.readOnly = true; }
+      if (bcStatus) { bcStatus.textContent = "Sponsor set & locked ✅"; bcStatus.className="small ok"; }
+      if (bcSummary) bcSummary.textContent = "Belief Chain Member • COB " + (state.cobAccepted ? "accepted" : "pending") + " + sponsor " + short(addr);
+
+      if (sponsorInput) {
+        sponsorInput.value = addr;
+        sponsorInput.readOnly = true;
+        sponsorInput.placeholder = "Locked from Belief Chain";
+      }
+    });
+
     // --- Log action ---
     $("#logBtn")?.addEventListener("click", async ()=>{
       if (!isAddr(state.wallet)) { alert("Connect wallet first"); return; }
       const id = $("#actionSelect")?.value || "RECRUIT_MEMBER";
-      const sponsor = ($("#sponsorInput")?.value||"").trim();
+
+      const sponsorField = $("#sponsorInput");
+      let sponsor = (sponsorField?.value||"").trim();
+      if (!sponsor && state.lockedSponsor) sponsor = state.lockedSponsor;
+
       const ptsMap = {
         RECRUIT_MEMBER:20, COACH_MEMBER:15, CREATE_CONTENT:10, SHARE_CONTENT:5,
         VERIFY_ID:15, QUALITY_CONTROL:5, FINLIT_LESSON:15, REPORTER:15,
